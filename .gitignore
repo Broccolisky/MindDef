@@ -1,0 +1,35 @@
+# ── Java / Maven ──
+target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+
+# ── IDE ──
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── HarmonyOS / DevEco Studio ──
+build/
+.cxx/
+.hvigor/
+oh_modules/
+node_modules/
+*.o
+*.so
+local.properties
+.hvigorport
+**/.preview/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Sensitive ──
+*.log
+application-local.yml
+**/model_info.txt
