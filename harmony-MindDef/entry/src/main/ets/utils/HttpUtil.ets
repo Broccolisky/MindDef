@@ -35,8 +35,8 @@ async function getToken(): Promise<string> {
  * @returns 后端返回的 data 字段
  */
 export async function request(url: string, method: string, data?: object): Promise<object | null> {
+  let httpRequest = http.createHttp();
   try {
-    let httpRequest = http.createHttp();
     let token: string = await getToken();
 
     let headers: Record<string, string> = {
@@ -53,14 +53,17 @@ export async function request(url: string, method: string, data?: object): Promi
       readTimeout: 10000
     };
 
-    // GET 请求参数拼在 URL 上
+    // GET 请求参数拼在 URL 上（跳过 null/undefined 值）
     let fullUrl: string = BASE_URL + url;
     if (method === 'GET' && data) {
       let params: string[] = [];
       let keys: string[] = Object.keys(data);
       for (let i = 0; i < keys.length; i++) {
         let key: string = keys[i];
-        params.push(`${key}=${encodeURIComponent(String((data as Record<string, Object>)[key]))}`);
+        let val: Object = (data as Record<string, Object>)[key];
+        if (val !== null && val !== undefined) {
+          params.push(`${key}=${encodeURIComponent(String(val))}`);
+        }
       }
       fullUrl += '?' + params.join('&');
     } else if (data) {
@@ -68,8 +71,6 @@ export async function request(url: string, method: string, data?: object): Promi
     }
 
     let response = await httpRequest.request(fullUrl, requestOptions);
-    httpRequest.destroy();
-
     let result: Record<string, Object> = JSON.parse(response.result as string);
 
     // 统一处理 401 → 清除 token，跳转登录页
@@ -77,6 +78,7 @@ export async function request(url: string, method: string, data?: object): Promi
       let prefs = await preferences.getPreferences(getContext(), PREF_NAME);
       await prefs.delete('token');
       await prefs.flush();
+      // 防止并发 401 多次跳转
       router.replaceUrl({ url: 'pages/LoginPage' });
       return null;
     }
@@ -98,6 +100,8 @@ export async function request(url: string, method: string, data?: object): Promi
       duration: 2000
     });
     return null;
+  } finally {
+    httpRequest.destroy();
   }
 }
 

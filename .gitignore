@@ -32,4 +32,5 @@ Thumbs.db
 # ── Sensitive ──
 *.log
 application-local.yml
+application.yml
 **/model_info.txt

@@ -35,6 +35,16 @@ struct SliderCreatePage {
     return getUrgencyLabel(this.urgency);
   }
 
+  onPageShow(): void {
+    // 读取引导页"微调"传入的参数
+    let params: Record<string, Object> = router.getParams() as Record<string, Object>;
+    if (params) {
+      if (params['content'] !== undefined) this.content = params['content'] as string;
+      if (params['importance'] !== undefined) this.importance = params['importance'] as number;
+      if (params['urgency'] !== undefined) this.urgency = params['urgency'] as number;
+    }
+  }
+
   build() {
     Column() {
       // ── 标题栏 ──

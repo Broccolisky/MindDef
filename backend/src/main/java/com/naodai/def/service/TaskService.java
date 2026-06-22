@@ -144,7 +144,7 @@ public class TaskService {
         Task task = checkOwnership(userId, taskId);
         task.setQuadrant(req.getQuadrant());
 
-        // 如果移到②象限，自动清空计划日期（由用户重新设置）
+        // 移出②象限时自动清空计划日期（②象限专属排程字段）
         if (req.getQuadrant() != 2) {
             task.setScheduledDate(null);
         }
@@ -182,6 +182,9 @@ public class TaskService {
         Task task = checkOwnership(userId, taskId);
         if (task.getStatus() == 3) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已被删除");
+        }
+        if (task.getStatus() == 2) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已完成");
         }
         task.setStatus(2);
         task.setCompletedAt(LocalDateTime.now());

@@ -14,10 +14,13 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * AI 服务 —— DeepSeek API 调用封装
@@ -48,15 +51,16 @@ public class AiService {
     private FaqMapper faqMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
-    /** 频率限制：key=userId, value=最近一次调用时间戳列表 */
-    private final Map<Long, List<Long>> rateLimitMap = new ConcurrentHashMap<>();
+    /** 频率限制：key=userId, value=最近一次调用时间戳（线程安全） */
+    private final Map<Long, ConcurrentLinkedDeque<Long>> rateLimitMap = new ConcurrentHashMap<>();
 
-    @PostConstruct
-    public void init() {
-        // 设置 RestTemplate 超时
-        // 注：简化实现，Spring Boot 默认超时足够
+    public AiService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     // ════════════════════════════════════════════════════
@@ -102,7 +106,8 @@ public class AiService {
             List<AiTaskItem> items = new ArrayList<>();
             for (Map<String, Object> t : taskList) {
                 AiTaskItem item = new AiTaskItem();
-                item.setContent(String.valueOf(t.getOrDefault("content", "未命名事项")));
+                Object contentObj = t.get("content");
+                item.setContent(contentObj != null ? String.valueOf(contentObj) : "未命名事项");
 
                 // 校验 importance
                 int importance = toInt(t.get("importance"), 50);
@@ -236,9 +241,11 @@ public class AiService {
 
             @SuppressWarnings("unchecked")
             Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-            String content = String.valueOf(message.get("content"));
-
-            return content;
+            Object contentObj = message.get("content");
+            if (contentObj == null) {
+                throw new BusinessException(ResultCode.SERVER_ERROR, "AI 服务返回格式异常");
+            }
+            return String.valueOf(contentObj);
 
         } catch (BusinessException e) {
             throw e;
@@ -303,16 +310,16 @@ public class AiService {
         long now = System.currentTimeMillis();
         long oneMinuteAgo = now - 60_000;
 
-        List<Long> timestamps = rateLimitMap.computeIfAbsent(userId, k -> new ArrayList<>());
-
-        // 清理 1 分钟前的记录
-        timestamps.removeIf(t -> t < oneMinuteAgo);
-
-        if (timestamps.size() >= 10) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "AI 调用太频繁，请稍后再试（每分钟限 10 次）");
-        }
-
-        timestamps.add(now);
+        rateLimitMap.compute(userId, (k, v) -> {
+            if (v == null) v = new ConcurrentLinkedDeque<>();
+            // 清理过期记录
+            v.removeIf(t -> t < oneMinuteAgo);
+            if (v.size() >= 10) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "AI 调用太频繁，请稍后再试（每分钟限 10 次）");
+            }
+            v.add(now);
+            return v.isEmpty() ? null : v;  // 空队列时移除条目，防止内存泄漏
+        });
     }
 
     // ════════════════════════════════════════════════════

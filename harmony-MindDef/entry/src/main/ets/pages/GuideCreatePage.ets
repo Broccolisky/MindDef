@@ -16,6 +16,7 @@ struct GuideCreatePage {
   @State step: number = 1;          // 1:填内容 2:Q1 3:Q2 4:确认
   @State urgency: number = 50;
   @State importance: number = 50;
+  @State loading: boolean = false;   // 防重复提交
 
   get quadrant(): number {
     return calcQuadrant(this.importance, this.urgency);
@@ -215,6 +216,7 @@ struct GuideCreatePage {
         .backgroundColor('#4a90d9')
         .borderRadius(24)
         .margin({ bottom: 16 })
+        .enabled(!this.loading)
         .onClick(() => { this.doCreate(); })
 
       Button('微调')
@@ -267,6 +269,8 @@ struct GuideCreatePage {
    * 提交创建
    */
   async doCreate(): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
     try {
       let reqData: Record<string, Object> = {
         'content': this.content.trim(),
@@ -281,8 +285,8 @@ struct GuideCreatePage {
         router.back();
         // 回到首页后会触发 onPageShow 刷新
       }
-    } catch (e) {
-      // HttpUtil 已处理 Toast
+    } finally {
+      this.loading = false;
     }
   }
 }

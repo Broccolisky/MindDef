@@ -1,0 +1,44 @@
+# MindDef 配置模板
+# 复制此文件为 application.yml 并填入你的配置
+
+server:
+  port: 8080
+
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher  # springfox + Spring Boot 2.7 兼容
+  datasource:
+    url: jdbc:mysql://localhost:3306/minddef?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: your_mysql_username
+    password: your_mysql_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: status
+      logic-delete-value: 3
+      logic-not-delete-value: 0
+
+# JWT 配置（生产环境请更换密钥）
+jwt:
+  secret: your_jwt_secret_key_change_me
+  expiration: 86400000  # 24 小时 (毫秒)
+
+# DeepSeek AI 配置（请填入你的 API Key）
+deepseek:
+  api-url: https://api.deepseek.com/v1/chat/completions
+  api-key: sk-your-deepseek-api-key
+  model: deepseek-v4-flash
+  timeout: 8000
+
+logging:
+  level:
+    com.naodai.def: debug

@@ -42,6 +42,12 @@ public class FocusService {
         if (task.getStatus() == 3) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已被删除");
         }
+        if (task.getStatus() == 1) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已在专注中");
+        }
+        if (task.getStatus() == 2) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已完成");
+        }
 
         // 更新任务状态为进行中
         task.setStatus(1);
@@ -68,7 +74,15 @@ public class FocusService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "专注记录不存在");
         }
 
+        // 防止重复结束
+        if (session.getDuration() != null && session.getDuration() > 0) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "该专注记录已结束");
+        }
+
         // 校验任务归属
+        if (session.getTaskId() == null) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "专注记录数据异常");
+        }
         Task task = taskMapper.selectById(session.getTaskId());
         if (task == null || !task.getUserId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权操作");
@@ -77,6 +91,14 @@ public class FocusService {
         session.setDuration(req.getDuration());
         session.setCompleted(req.getCompleted() != null ? req.getCompleted() : 1);
         focusSessionMapper.updateById(session);
+
+        // 重置任务状态：完成→2，放弃→0
+        boolean completed = req.getCompleted() != null && req.getCompleted() == 1;
+        task.setStatus(completed ? 2 : 0);
+        if (completed) {
+            task.setCompletedAt(LocalDateTime.now());
+        }
+        taskMapper.updateById(task);
 
         return session;
     }

@@ -6,7 +6,7 @@
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { get, put } from '../utils/HttpUtil';
-import { clearLoginInfo, getNickname } from '../utils/TokenUtil';
+import { clearLoginInfo, getNickname, saveLoginInfo, getToken, getUserId } from '../utils/TokenUtil';
 
 @Entry
 @Component
@@ -41,6 +41,10 @@ export struct ProfilePage {
     if (data) {
       this.nickname = this.newNickname.trim();
       this.showNicknameEdit = false;
+      // 同步到 Preferences，避免冷启动回退
+      let token: string = await getToken();
+      let userId: number = await getUserId();
+      await saveLoginInfo(token, userId, this.nickname);
       promptAction.showToast({ message: '昵称修改成功', duration: 1000 });
     }
   }

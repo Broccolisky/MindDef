@@ -20,8 +20,7 @@ struct Index {
   @State tasks: TaskModel[] = [];
   @State loading: boolean = true;
   @State showCreateMenu: boolean = false;
-  @State selectedTask: TaskModel | null = null;
-  @State showActionMenu: boolean = false;
+  // selectedTask/showActionMenu 已移除 —— handleLongPress 直接调用 AlertDialog
 
   // 四个象限元数据
   private quadrants: QuadrantInfo[] = [
@@ -94,8 +93,47 @@ struct Index {
   }
 
   handleLongPress(task: TaskModel): void {
-    this.selectedTask = task;
-    this.showActionMenu = true;
+    // 捕获引用，避免闭包中 selectedTask 被 null 化
+    let capturedTask: TaskModel = task;
+    AlertDialog.show({
+      title: '操作',
+      message: capturedTask.content,
+      autoCancel: true,
+      alignment: DialogAlignment.Bottom,
+      primaryButton: {
+        value: '编辑',
+        action: () => {
+          router.pushUrl({ url: 'pages/SliderCreatePage', params: { taskId: capturedTask.id } });
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        action: () => {}
+      },
+      buttons: [
+        {
+          value: '移到①立刻做',
+          action: () => { this.moveToQuadrant(capturedTask, 1); }
+        },
+        {
+          value: '移到②计划做',
+          action: () => { this.moveToQuadrant(capturedTask, 2); }
+        },
+        {
+          value: '移到③简化做',
+          action: () => { this.moveToQuadrant(capturedTask, 3); }
+        },
+        {
+          value: '移到④不做',
+          action: () => { this.moveToQuadrant(capturedTask, 4); }
+        },
+        {
+          value: '删除',
+          fontColor: '#e74c3c',
+          action: () => { this.deleteTask(capturedTask); }
+        }
+      ]
+    });
   }
 
   async quickComplete(task: TaskModel): Promise<void> {
@@ -128,58 +166,6 @@ struct Index {
   }
 
   // ──────────── 操作菜单 ────────────
-
-  buildActionMenu(): void {
-    if (!this.showActionMenu || !this.selectedTask) {
-      return;
-    }
-
-    AlertDialog.show({
-      title: '操作',
-      message: this.selectedTask.content,
-      autoCancel: true,
-      alignment: DialogAlignment.Bottom,
-      primaryButton: {
-        value: '编辑',
-        action: () => {
-          let task: TaskModel | null = this.selectedTask;
-          if (task) {
-            router.pushUrl({ url: 'pages/SliderCreatePage', params: { taskId: task.id } });
-          }
-        }
-      },
-      secondaryButton: {
-        value: '取消',
-        action: () => {}
-      },
-      buttons: [
-        {
-          value: '移到①立刻做',
-          action: () => { if (this.selectedTask) this.moveToQuadrant(this.selectedTask, 1); }
-        },
-        {
-          value: '移到②计划做',
-          action: () => { if (this.selectedTask) this.moveToQuadrant(this.selectedTask, 2); }
-        },
-        {
-          value: '移到③简化做',
-          action: () => { if (this.selectedTask) this.moveToQuadrant(this.selectedTask, 3); }
-        },
-        {
-          value: '移到④不做',
-          action: () => { if (this.selectedTask) this.moveToQuadrant(this.selectedTask, 4); }
-        },
-        {
-          value: '删除',
-          fontColor: '#e74c3c',
-          action: () => { if (this.selectedTask) this.deleteTask(this.selectedTask); }
-        }
-      ]
-    });
-
-    this.showActionMenu = false;
-    this.selectedTask = null;
-  }
 
   // ──────────── 创建菜单 ────────────
 

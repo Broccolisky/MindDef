@@ -86,7 +86,7 @@ public class TaskController {
     @ApiOperation("设置计划日期")
     @PutMapping("/{id}/schedule")
     public Result<Task> schedule(@PathVariable Long id,
-                                 @RequestBody ScheduleRequest req,
+                                 @Valid @RequestBody ScheduleRequest req,
                                  HttpServletRequest request) {
         Task task = taskService.schedule(getUserId(request), id, req);
         return Result.ok(task);

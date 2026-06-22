@@ -237,6 +237,7 @@ struct AiParsePage {
             .fontSize(12)
             .backgroundColor('#27ae60')
             .borderRadius(16)
+            .enabled(!item.confirmed)
             .onClick(() => { this.confirmOne(index); })
 
           Button('修改')

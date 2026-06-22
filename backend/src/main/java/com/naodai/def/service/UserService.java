@@ -61,6 +61,9 @@ public class UserService {
         }
 
         User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "用户不存在");
+        }
 
         // 校验旧密码
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {

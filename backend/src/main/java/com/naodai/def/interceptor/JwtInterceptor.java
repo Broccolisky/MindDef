@@ -51,6 +51,12 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         // 将 userId 存入 request attribute，供后续 Controller 使用
         Long userId = jwtUtil.getUserId(token);
+        if (userId == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"msg\":\"Token解析失败\",\"data\":null}");
+            return false;
+        }
         request.setAttribute("userId", userId);
 
         return true;

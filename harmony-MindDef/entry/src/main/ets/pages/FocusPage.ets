@@ -17,6 +17,8 @@ struct FocusPage {
   @State isRunning: boolean = false;
   @State sessionId: number = 0;
   @State isComplete: boolean = false;
+  @State starting: boolean = false;         // 防重复点击
+  @State navigating: boolean = false;       // 防重复导航
   private timerId: number = -1;
 
   // ── 初始化 ──
@@ -30,7 +32,11 @@ struct FocusPage {
   }
 
   onPageHide(): void {
-    this.stopTimer();
+    if (this.isRunning && this.sessionId > 0) {
+      this.doEnd(false);  // 后台切走→自动结束专注（放弃）
+    } else {
+      this.stopTimer();
+    }
   }
 
   // ── 格式化显示 ──
@@ -58,6 +64,7 @@ struct FocusPage {
       } else {
         this.stopTimer();
         this.isComplete = true;
+        this.doEnd(true);  // 倒计时结束→自动完成
       }
     }, 1000);
   }
@@ -73,26 +80,40 @@ struct FocusPage {
   // ── API 调用 ──
 
   async doStart(): Promise<void> {
-    let startData: Record<string, number> = { 'taskId': this.taskId };
-    let data: object | null = await post('/api/focus/start', startData);
-    if (data) {
-      this.sessionId = (data as Record<string, number>)['id'];
-      this.startTimer();
+    if (this.starting) return;  // 防重复点击
+    this.starting = true;
+    try {
+      let startData: Record<string, number> = { 'taskId': this.taskId };
+      let data: object | null = await post('/api/focus/start', startData);
+      if (data) {
+        let idVal: number | undefined = (data as Record<string, number>)['id'];
+        if (idVal !== undefined && idVal !== null) {
+          this.sessionId = idVal;
+          this.startTimer();
+        }
+      }
+    } finally {
+      this.starting = false;
     }
   }
 
   async doEnd(completed: boolean): Promise<void> {
+    if (this.navigating) return;  // 防重复导航
     this.stopTimer();
-    let duration: number = this.totalSeconds - this.remainSeconds;
-    let endData: Record<string, number> = {
-      'sessionId': this.sessionId,
-      'duration': duration,
-      'completed': completed ? 1 : 0
-    };
-    let data: object | null = await post('/api/focus/end', endData);
-    if (data) {
-      promptAction.showToast({ message: completed ? '专注完成!' : '已放弃', duration: 1000 });
-      router.back();
+    this.navigating = true;
+    try {
+      let duration: number = this.totalSeconds - this.remainSeconds;
+      let endData: Record<string, number> = {
+        'sessionId': this.sessionId,
+        'duration': duration,
+        'completed': completed ? 1 : 0
+      };
+      let data: object | null = await post('/api/focus/end', endData);
+      if (data) {
+        promptAction.showToast({ message: completed ? '专注完成!' : '已放弃', duration: 1000 });
+      }
+    } finally {
+      router.back();  // 无论 API 成败都返回
     }
   }
 
@@ -106,6 +127,7 @@ struct FocusPage {
           .fontSize(14)
           .fontColor('#4a90d9')
           .onClick(() => {
+            if (this.navigating) return;
             if (this.isRunning) {
               this.doEnd(false);
             } else {
@@ -167,6 +189,7 @@ struct FocusPage {
           .backgroundColor('#e74c3c')
           .borderRadius(24)
           .margin({ top: 60 })
+          .enabled(!this.starting)
           .onClick(() => { this.doStart(); })
       }
 

@@ -118,12 +118,17 @@ struct LoginPage {
       let data: Record<string, Object> | null = await post('/api/auth/login', loginData) as Record<string, Object> | null;
 
       if (data) {
+        // 校验必要字段存在
+        let token: string = data['token'] as string;
+        let userId: number = data['userId'] as number;
+        let nickname: string = (data['nickname'] as string) || this.username.trim();
+        if (!token || !userId) {
+          promptAction.showToast({ message: '登录响应异常', duration: 1500 });
+          return;
+        }
+
         // 保存登录信息
-        await saveLoginInfo(
-          data['token'] as string,
-          data['userId'] as number,
-          data['nickname'] as string
-        );
+        await saveLoginInfo(token, userId, nickname);
 
         promptAction.showToast({ message: '登录成功', duration: 1500 });
 
