@@ -39,6 +39,7 @@ CREATE TABLE task (
     source          TINYINT         NOT NULL DEFAULT 1       COMMENT '来源 1:手动 2:AI识别 3:引导',
     status          TINYINT         NOT NULL DEFAULT 0       COMMENT '状态 0:待办 1:进行中 2:完成 3:已删除',
     scheduled_date  DATE            DEFAULT NULL             COMMENT '计划日期(②象限)',
+    repeat_mode     TINYINT         NOT NULL DEFAULT 0       COMMENT '重复模式 0:不重复 1:每日 2:仅工作日 3:仅休息日',
     created_at      DATETIME        NOT NULL DEFAULT NOW()   COMMENT '创建时间',
     completed_at    DATETIME        DEFAULT NULL             COMMENT '完成时间',
     PRIMARY KEY (id),

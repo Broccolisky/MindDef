@@ -6,7 +6,7 @@
  */
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
-import { post } from '../utils/HttpUtil';
+import { post, put } from '../utils/HttpUtil';
 import { calcQuadrant, getAdvice, getImportanceLabel, getUrgencyLabel, AiTaskItem } from '../model/TaskModel';
 import { IconLabel } from '../components/IconLabel';
 
@@ -19,6 +19,9 @@ struct SliderCreatePage {
   @State deadline: string = '';
   @State loading: boolean = false;
   @State deadlineDate: Date = new Date(); // 日期选择器选中值（默认今天）
+  @State isEditMode: boolean = false;
+  @State editTaskId: number = 0;
+  @State repeatMode: number = 0;
 
   // ── AI 识别面板（常驻）──
   @State aiRawText: string = '';
@@ -30,11 +33,35 @@ struct SliderCreatePage {
   // 改为在各处直接调用 calcQuadrant / getAdvice / getImportanceLabel / getUrgencyLabel
 
   aboutToAppear(): void {
-    // 通过 AppStorage 读取"微调"或 AI 解析页传入的参数
-    // 默认值优先
+    // ── 编辑模式检测 ──
+    let tid: number | undefined = AppStorage.get('edit_taskId') as number | undefined;
+    if (tid !== undefined && tid !== null && tid > 0) {
+      this.isEditMode = true;
+      this.editTaskId = tid;
+      this.content = (AppStorage.get('edit_taskContent') as string) || '';
+      this.importance = (AppStorage.get('edit_importance') as number) || 50;
+      this.urgency = (AppStorage.get('edit_urgency') as number) || 50;
+      this.repeatMode = (AppStorage.get('edit_repeatMode') as number) || 0;
+      let dl: string | undefined = AppStorage.get('edit_deadline') as string | undefined;
+      if (dl !== undefined && dl !== null && dl !== '') {
+        this.deadline = dl;
+        this.deadlineDate = new Date(dl);
+      }
+      AppStorage.delete('edit_taskId');
+      AppStorage.delete('edit_taskContent');
+      AppStorage.delete('edit_importance');
+      AppStorage.delete('edit_urgency');
+      AppStorage.delete('edit_deadline');
+      AppStorage.delete('edit_source');
+      AppStorage.delete('edit_repeatMode');
+      return;
+    }
+
+    // ── 创建模式：读取"微调"或 AI 解析页传入的参数 ──
     this.content = '';
     this.importance = 50;
     this.urgency = 50;
+    this.repeatMode = 0;
 
     let c: string | undefined = AppStorage.get('slider_content') as string | undefined;
     if (c !== undefined && c !== null) {
@@ -52,7 +79,6 @@ struct SliderCreatePage {
     if (dl !== undefined && dl !== null && dl !== '') {
       this.deadline = dl;
     }
-    // 清理 AppStorage，避免残留
     AppStorage.delete('slider_content');
     AppStorage.delete('slider_importance');
     AppStorage.delete('slider_urgency');
@@ -76,7 +102,7 @@ struct SliderCreatePage {
 
         Blank()
 
-        Text('新建事项')
+        Text(this.isEditMode ? '编辑事项' : '新建事项')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
 
@@ -251,6 +277,16 @@ struct SliderCreatePage {
           .width('100%')
           .padding({ left: 20, right: 20 })
 
+          // ── 重复模式（快捷选择）──
+          Row() {
+            this.buildRepeatChip('每日', 1);
+            this.buildRepeatChip('仅工作日', 2);
+            this.buildRepeatChip('仅休息日', 3);
+          }
+          .width('100%')
+          .padding({ left: 20, right: 20 })
+          .margin({ top: 12 })
+
           // ── 实时判定卡片 ──
           Row() {
             Column() {
@@ -307,7 +343,7 @@ struct SliderCreatePage {
             .height(16)
 
           // ── 提交按钮 ──
-          Button(this.loading ? '创建中...' : '放入象限')
+          Button(this.isEditMode ? (this.loading ? '保存中...' : '保存修改') : (this.loading ? '创建中...' : '放入象限'))
             .width('100%')
             .height(48)
             .fontSize(16)
@@ -317,7 +353,11 @@ struct SliderCreatePage {
             .margin({ left: 32, right: 32, bottom: 40 })
             .enabled(this.canSubmit() && !this.loading)
             .onClick(() => {
-              this.doCreate();
+              if (this.isEditMode) {
+                this.doUpdate();
+              } else {
+ this.doCreate();
+              }
             })
         }
         .width('100%')
@@ -330,6 +370,24 @@ struct SliderCreatePage {
     .width('100%')
     .height('100%')
     .backgroundColor('#ffffff')
+  }
+
+  // ═══════════════════════════════════════════
+  //  通用 @Builder 方法
+  // ═══════════════════════════════════════════
+
+  @Builder
+  buildRepeatChip(label: string, value: number) {
+    Text(label)
+      .fontSize(13)
+      .fontColor(this.repeatMode === value ? '#ffffff' : '#666')
+      .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+      .backgroundColor(this.repeatMode === value ? '#4a90d9' : '#f0f0f0')
+      .borderRadius(16)
+      .margin({ right: 8 })
+      .onClick(() => {
+        this.repeatMode = (this.repeatMode === value) ? 0 : value;
+      })
   }
 
   // ═══════════════════════════════════════════
@@ -604,10 +662,39 @@ struct SliderCreatePage {
       if (this.deadline.trim()) {
         reqData['deadline'] = this.deadline.trim();
       }
+      if (this.repeatMode > 0) {
+        reqData['repeatMode'] = this.repeatMode;
+      }
 
       let data: object | null = await post('/api/task', reqData);
       if (data) {
         promptAction.showToast({ message: '创建成功', duration: 1000 });
+        router.back();
+      }
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async doUpdate(): Promise<void> {
+    this.loading = true;
+    try {
+      let reqData: Record<string, Object> = {
+        'content': this.content.trim(),
+        'importance': this.importance,
+        'urgency': this.urgency,
+        'source': 1
+      };
+      if (this.deadline.trim()) {
+        reqData['deadline'] = this.deadline.trim();
+      } else {
+        reqData['deadline'] = '';
+      }
+      reqData['repeatMode'] = this.repeatMode;
+
+      let data: object | null = await put('/api/task/' + this.editTaskId, reqData);
+      if (data) {
+        promptAction.showToast({ message: '修改已保存', duration: 1000 });
         router.back();
       }
     } finally {

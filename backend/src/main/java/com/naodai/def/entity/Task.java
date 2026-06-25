@@ -45,6 +45,9 @@ public class Task {
     /** 计划日期（②象限排程） */
     private LocalDate scheduledDate;
 
+    /** 重复模式 0:不重复 1:每日 2:仅工作日 3:仅休息日 */
+    private Integer repeatMode;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 

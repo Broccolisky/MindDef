@@ -97,18 +97,15 @@ struct Index {
   // ──────────── 象限交互 ────────────
 
   handleTaskTap(task: TaskModel): void {
-    if (task.quadrant === 3) {
-      // ③ 象限：快速完成
-      this.quickComplete(task);
-    } else if (task.quadrant === 1) {
-      // ① 象限：跳转番茄钟（通过 AppStorage 传参，绕过 router 序列化问题）
-      AppStorage.setOrCreate('focus_taskId', task.id ?? 0);
-      AppStorage.setOrCreate('focus_taskContent', task.content ?? '');
-      router.pushUrl({ url: 'pages/FocusPage' });
-    } else if (task.quadrant === 2) {
-      // ② 象限：排日程
-      this.showScheduleDialog(task);
-    }
+    // 所有象限统一：进入编辑页
+    AppStorage.setOrCreate('edit_taskId', task.id ?? 0);
+    AppStorage.setOrCreate('edit_taskContent', task.content ?? '');
+    AppStorage.setOrCreate('edit_importance', task.importance ?? 50);
+    AppStorage.setOrCreate('edit_urgency', task.urgency ?? 50);
+    AppStorage.setOrCreate('edit_deadline', task.deadline ?? '');
+    AppStorage.setOrCreate('edit_source', task.source ?? 1);
+    AppStorage.setOrCreate('edit_repeatMode', task.repeatMode ?? 0);
+    router.pushUrl({ url: 'pages/SliderCreatePage' });
   }
 
   handleLongPress(task: TaskModel): void {
@@ -231,31 +228,95 @@ struct Index {
   }
 
   /**
-   * 拖拽时底部浮现的垃圾桶
+   * 拖拽 → 番茄钟区域（上方）
    */
   @Builder
-  buildTrashZone() {
+  buildTomatoDropZone() {
     Column() {
-      Image($r('app.media.icon_trash'))
-        .width(40)
-        .height(40)
+      Image($r('app.media.icon_tomato'))
+        .width(36)
+        .height(36)
         .fillColor('#ffffff')
-      Text('拖到这里删除')
+      Text('番茄钟')
         .fontSize(12)
         .fontColor('#ffffff')
         .margin({ top: 2 })
     }
-    .width('88%')
-    .height(66)
+    .width('45%')
+    .height(64)
     .backgroundColor('#e74c3c')
     .borderRadius(16)
     .justifyContent(FlexAlign.Center)
     .opacity(0.88)
-    .position({ x: '6%', y: '90%' })
-    .shadow({ radius: 12, color: '#60000000' })
+    .position({ x: '50%', y: '3%' })
+    .shadow({ radius: 10, color: '#60000000' })
     .onDrop((event: DragEvent) => {
       if (this.dragTask !== null) {
         let task: TaskModel = this.dragTask;
+        AppStorage.setOrCreate('focus_taskId', task.id ?? 0);
+        AppStorage.setOrCreate('focus_taskContent', task.content ?? '');
+        this.isDragging = false;
+        this.dragTask = null;
+        router.pushUrl({ url: 'pages/FocusPage' });
+      }
+    })
+  }
+
+  /**
+   * 拖拽 → 完成区域（下方左）
+   */
+  @Builder
+  buildCompleteDropZone() {
+    Column() {
+      Image($r('app.media.icon_check'))
+        .width(32)
+        .height(32)
+        .fillColor('#ffffff')
+      Text('完成')
+        .fontSize(12)
+        .fontColor('#ffffff')
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .height(64)
+    .backgroundColor('#27ae60')
+    .borderRadius({ topLeft: 16, bottomLeft: 16 })
+    .justifyContent(FlexAlign.Center)
+    .onDrop((event: DragEvent) => {
+      if (this.dragTask !== null) {
+        let task: TaskModel = this.dragTask;
+        this.isDragging = false;
+        this.dragTask = null;
+        this.quickComplete(task);
+      }
+    })
+  }
+
+  /**
+   * 拖拽 → 删除区域（下方右）
+   */
+  @Builder
+  buildDeleteDropZone() {
+    Column() {
+      Image($r('app.media.icon_trash'))
+        .width(32)
+        .height(32)
+        .fillColor('#ffffff')
+      Text('删除')
+        .fontSize(12)
+        .fontColor('#ffffff')
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .height(64)
+    .backgroundColor('#e74c3c')
+    .borderRadius({ topRight: 16, bottomRight: 16 })
+    .justifyContent(FlexAlign.Center)
+    .onDrop((event: DragEvent) => {
+      if (this.dragTask !== null) {
+        let task: TaskModel = this.dragTask;
+        this.isDragging = false;
+        this.dragTask = null;
         this.deleteTask(task);
       }
     })
@@ -395,7 +456,7 @@ struct Index {
                 .layoutWeight(1)
 
                 // 版本号
-                Text('v0.6.4')
+                Text('v0.7.1')
                   .fontSize(12)
                   .fontColor('#bbb')
                   .padding({ bottom: 8 })
@@ -453,9 +514,15 @@ struct Index {
         .width('100%')
         .height('100%')
 
-        // ── 拖拽垃圾桶（拖拽中浮现）──
+        // ── 拖拽操作区（拖拽中浮现）──
         if (this.isDragging) {
-          this.buildTrashZone();
+          this.buildTomatoDropZone();
+          Row() {
+            this.buildCompleteDropZone();
+            this.buildDeleteDropZone();
+          }
+          .width('88%')
+          .position({ x: '6%', y: '90%' })
         }
       }
       .width('100%')

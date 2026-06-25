@@ -12,6 +12,7 @@ export class TaskModel {
   source: number = 1;
   status: number = 0;
   scheduledDate: string | null = null;
+  repeatMode: number = 0;
   createdAt: string = '';
   completedAt: string | null = null;
 }
@@ -41,13 +42,13 @@ export class QuadrantInfo {
 export function getQuadrantInfo(quadrant: number): QuadrantInfo {
   switch (quadrant) {
     case 1:
-      return new QuadrantInfo(1, '立刻做', '#ffe0e0', '点击开始番茄钟');
+      return new QuadrantInfo(1, '立刻做', '#ffe0e0', '点击编辑');
     case 2:
-      return new QuadrantInfo(2, '计划做', '#e0f0ff', '点击排日程');
+      return new QuadrantInfo(2, '计划做', '#e0f0ff', '点击编辑');
     case 3:
-      return new QuadrantInfo(3, '简化做', '#fff5e0', '点击快速完成');
+      return new QuadrantInfo(3, '简化做', '#fff5e0', '点击编辑');
     case 4:
-      return new QuadrantInfo(4, '不做', '#e8e8e8', '左滑删除');
+      return new QuadrantInfo(4, '不做', '#e8e8e8', '点击编辑');
     default:
       return new QuadrantInfo(1, '', '', '');
   }

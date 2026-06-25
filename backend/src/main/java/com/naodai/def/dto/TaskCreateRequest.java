@@ -36,6 +36,10 @@ public class TaskCreateRequest {
     @ApiModelProperty(value = "来源 1手动/2AI/3引导", example = "1")
     private Integer source = 1;
 
+    /** 重复模式 0:不重复 1:每日 2:仅工作日 3:仅休息日 */
+    @ApiModelProperty(value = "重复模式 0:不重复 1:每日 2:仅工作日 3:仅休息日", example = "0")
+    private Integer repeatMode = 0;
+
     // ── Getter / Setter ──
 
     public String getContent() { return content; }
@@ -52,4 +56,7 @@ public class TaskCreateRequest {
 
     public Integer getSource() { return source; }
     public void setSource(Integer source) { this.source = source; }
+
+    public Integer getRepeatMode() { return repeatMode; }
+    public void setRepeatMode(Integer repeatMode) { this.repeatMode = repeatMode; }
 }

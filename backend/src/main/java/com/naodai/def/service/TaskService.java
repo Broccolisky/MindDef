@@ -93,6 +93,7 @@ public class TaskService {
             }
         }
 
+        task.setRepeatMode(req.getRepeatMode() != null ? req.getRepeatMode() : 0);
         task.setStatus(0); // 待办
         taskMapper.insert(task);
         return task;
@@ -126,11 +127,48 @@ public class TaskService {
     // ──────────── 编辑 ────────────
 
     /**
-     * 编辑任务内容
+     * 编辑任务（支持内容/重要性/紧急性/截止日期/来源/重复模式）
      */
     public Task update(Long userId, Long taskId, TaskUpdateRequest req) {
         Task task = checkOwnership(userId, taskId);
         task.setContent(req.getContent());
+
+        // 重设重要性+紧急性 → 重算象限
+        if (req.getImportance() != null && req.getUrgency() != null) {
+            task.setImportance(req.getImportance());
+            task.setUrgency(req.getUrgency());
+            task.setQuadrant(calcQuadrant(req.getImportance(), req.getUrgency()));
+        } else if (req.getImportance() != null) {
+            task.setImportance(req.getImportance());
+            task.setQuadrant(calcQuadrant(req.getImportance(), task.getUrgency()));
+        } else if (req.getUrgency() != null) {
+            task.setUrgency(req.getUrgency());
+            task.setQuadrant(calcQuadrant(task.getImportance(), req.getUrgency()));
+        }
+
+        // 处理截止日期
+        if (req.getDeadline() != null) {
+            if (req.getDeadline().isEmpty()) {
+                task.setDeadline(null);
+            } else {
+                try {
+                    task.setDeadline(LocalDate.parse(req.getDeadline()));
+                } catch (Exception e) {
+                    throw new BusinessException(ResultCode.BAD_REQUEST, "截止日期格式错误，须为 yyyy-MM-dd");
+                }
+            }
+        }
+
+        // 来源
+        if (req.getSource() != null) {
+            task.setSource(req.getSource());
+        }
+
+        // 重复模式
+        if (req.getRepeatMode() != null) {
+            task.setRepeatMode(req.getRepeatMode());
+        }
+
         taskMapper.updateById(task);
         return task;
     }
