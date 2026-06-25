@@ -92,3 +92,16 @@ export function getUrgencyLabel(val: number): string {
   if (val <= 75) return '比较急';
   return '非常紧急';
 }
+
+/**
+ * AI 解析结果项
+ */
+export class AiTaskItem {
+  content: string = '';
+  importance: number = 50;
+  urgency: number = 50;
+  deadline: string | null = null;
+  quadrant: number = 1;
+  advice: string = '';
+  confirmed: boolean = false;
+}

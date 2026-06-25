@@ -11,6 +11,7 @@ USE minddef;
 -- 1. 用户表 (user)
 -- ============================================================
 DROP TABLE IF EXISTS focus_session;
+DROP TABLE IF EXISTS faq;
 DROP TABLE IF EXISTS task;
 DROP TABLE IF EXISTS user;
 

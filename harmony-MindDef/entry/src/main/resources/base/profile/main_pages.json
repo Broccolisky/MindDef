@@ -5,9 +5,7 @@
     "pages/RegisterPage",
     "pages/SliderCreatePage",
     "pages/GuideCreatePage",
-    "pages/AiParsePage",
     "pages/FocusPage",
-    "pages/StatsPage",
     "pages/ProfilePage"
   ]
 }

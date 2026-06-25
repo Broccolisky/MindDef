@@ -2,8 +2,8 @@
  * 决策统计页面
  */
 import { get } from '../utils/HttpUtil';
+import { IconLabel } from '../components/IconLabel';
 
-@Entry
 @Component
 export struct StatsPage {
   @State total: number = 0;
@@ -17,7 +17,7 @@ export struct StatsPage {
   @State quad4: number = 0;
   @State loaded: boolean = false;
 
-  onPageShow(): void {
+  aboutToAppear(): void {
     this.loadStats();
   }
 
@@ -25,11 +25,11 @@ export struct StatsPage {
     let data: object | null = await get('/api/stats/overview');
     if (data) {
       let s: Record<string, Object> = data as Record<string, Object>;
-      this.total = s['total'] as number;
-      this.completed = s['completed'] as number;
-      this.abandoned = s['abandoned'] as number;
-      this.thisWeek = s['thisWeek'] as number;
-      this.thisMonth = s['thisMonth'] as number;
+      this.total = (s['total'] as number) || 0;
+      this.completed = (s['completed'] as number) || 0;
+      this.abandoned = (s['abandoned'] as number) || 0;
+      this.thisWeek = (s['thisWeek'] as number) || 0;
+      this.thisMonth = (s['thisMonth'] as number) || 0;
       let qd: Record<string, number> = s['quadrantDistribution'] as Record<string, number>;
       if (qd) {
         this.quad1 = qd['1'] || 0;
@@ -52,9 +52,15 @@ export struct StatsPage {
 
   build() {
     Column() {
-      Text('📊 我的决策统计')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
+      IconLabel({
+        icon: $r('app.media.icon_chart'),
+        label: '我的决策统计',
+        iconSize: 22,
+        fontSize: 20,
+        iconColor: '#4a90d9',
+        fontWeight: FontWeight.Bold,
+        spacing: 6
+      })
         .margin({ top: 20 })
 
       if (!this.loaded) {
@@ -62,9 +68,9 @@ export struct StatsPage {
       } else {
         // 概览卡片
         Row() {
-          this.buildStatCard('累计事项', '' + this.total, '#4a90d9')
-          this.buildStatCard('已完成', '' + this.completed, '#27ae60')
-          this.buildStatCard('已放弃', '' + this.abandoned, '#999')
+          this.buildStatCard('累计事项', String(this.total ?? '0'), '#4a90d9')
+          this.buildStatCard('已完成', String(this.completed ?? '0'), '#27ae60')
+          this.buildStatCard('已放弃', String(this.abandoned ?? '0'), '#999')
         }
         .width('90%')
         .justifyContent(FlexAlign.SpaceEvenly)
@@ -87,8 +93,8 @@ export struct StatsPage {
 
         // 时间维度
         Row() {
-          this.buildStatCard('本周完成', '' + this.thisWeek, '#f39c12')
-          this.buildStatCard('本月完成', '' + this.thisMonth, '#9b59b6')
+          this.buildStatCard('本周完成', String(this.thisWeek ?? '0'), '#f39c12')
+          this.buildStatCard('本月完成', String(this.thisMonth ?? '0'), '#9b59b6')
         }
         .width('90%')
         .justifyContent(FlexAlign.SpaceEvenly)

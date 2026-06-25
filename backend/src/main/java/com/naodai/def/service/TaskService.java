@@ -196,12 +196,11 @@ public class TaskService {
 
     /**
      * 软删除任务（status = 3）
-     * ④象限支持直接删除，其他象限删除前需确认
+     * MyBatis-Plus 逻辑删除：deleteById 自动将 status 置为 3，而不是物理删除
      */
     public void delete(Long userId, Long taskId) {
-        Task task = checkOwnership(userId, taskId);
-        task.setStatus(3);
-        taskMapper.updateById(task);
+        checkOwnership(userId, taskId);           // 归属校验（不过则抛异常）
+        taskMapper.deleteById(taskId);            // 触发 MyBatis-Plus 逻辑删除
     }
 
     // ──────────── 辅助方法 ────────────

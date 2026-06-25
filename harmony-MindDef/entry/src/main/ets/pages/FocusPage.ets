@@ -6,28 +6,36 @@
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { post } from '../utils/HttpUtil';
+import { IconLabel } from '../components/IconLabel';
 
 @Entry
 @Component
 struct FocusPage {
   @State taskId: number = 0;
   @State taskContent: string = '';
-  @State totalSeconds: number = 25 * 60;    // 25 分钟
+  @State focusMinutes: number = 25;            // 可调节的专注时长（分钟）
+  @State totalSeconds: number = 25 * 60;
   @State remainSeconds: number = 25 * 60;
   @State isRunning: boolean = false;
   @State sessionId: number = 0;
   @State isComplete: boolean = false;
-  @State starting: boolean = false;         // 防重复点击
-  @State navigating: boolean = false;       // 防重复导航
+  @State starting: boolean = false;            // 防重复点击
+  @State navigating: boolean = false;          // 防重复导航
+  @State isEditingTime: boolean = false;       // 是否正在编辑时长
+  @State editMinutes: string = '25';           // 编辑中的分钟数
   private timerId: number = -1;
 
   // ── 初始化 ──
 
-  onPageShow(): void {
-    let params: Record<string, Object> = router.getParams() as Record<string, Object>;
-    if (params) {
-      this.taskId = params['taskId'] as number;
-      this.taskContent = params['taskContent'] as string;
+  aboutToAppear(): void {
+    // 通过 AppStorage 读取参数（绕过 router.getParams 在 API 24 的序列化 bug）
+    let tid: number | undefined = AppStorage.get('focus_taskId') as number | undefined;
+    if (tid !== undefined && tid !== null) {
+      this.taskId = tid;
+    }
+    let tc: string | undefined = AppStorage.get('focus_taskContent') as string | undefined;
+    if (tc !== undefined && tc !== null) {
+      this.taskContent = tc;
     }
   }
 
@@ -39,18 +47,50 @@ struct FocusPage {
     }
   }
 
-  // ── 格式化显示 ──
-  get displayMin(): string {
+  // ── 时长调节 ──
+
+  /**
+   * 更新专注时长（滑块或手动输入调用）
+   */
+  applyFocusMinutes(minutes: number): void {
+    let clamped: number = minutes < 1 ? 1 : (minutes > 120 ? 120 : minutes);
+    this.focusMinutes = clamped;
+    this.totalSeconds = clamped * 60;
+    this.remainSeconds = clamped * 60;
+  }
+
+  /**
+   * 点击时间文字 → 弹出数字键盘编辑
+   */
+  startEditTime(): void {
+    if (this.isRunning || this.isComplete) return;
+    this.editMinutes = String(this.focusMinutes);
+    this.isEditingTime = true;
+  }
+
+  /**
+   * 确认编辑
+   */
+  confirmEditTime(): void {
+    let val: number = parseInt(this.editMinutes);
+    if (!isNaN(val) && val >= 1 && val <= 120) {
+      this.applyFocusMinutes(val);
+    }
+    this.isEditingTime = false;
+  }
+
+  // ── 格式化显示（不用 get 访问器 —— ArkTS API 24 getter 不响应 @State）──
+  formatMin(): string {
     let m: number = Math.floor(this.remainSeconds / 60);
     return m < 10 ? '0' + m : '' + m;
   }
 
-  get displaySec(): string {
+  formatSec(): string {
     let s: number = this.remainSeconds % 60;
     return s < 10 ? '0' + s : '' + s;
   }
 
-  get progress(): number {
+  formatProgress(): number {
     return (this.totalSeconds - this.remainSeconds) / this.totalSeconds * 100;
   }
 
@@ -123,9 +163,15 @@ struct FocusPage {
     Column() {
       // 标题栏
       Row() {
-        Text('← 返回')
-          .fontSize(14)
-          .fontColor('#4a90d9')
+        IconLabel({
+          icon: $r('app.media.icon_back'),
+          label: '返回',
+          iconSize: 16,
+          fontSize: 14,
+          iconColor: '#4a90d9',
+          fontColor: '#4a90d9',
+          spacing: 2
+        })
           .onClick(() => {
             if (this.navigating) return;
             if (this.isRunning) {
@@ -150,7 +196,7 @@ struct FocusPage {
       Divider()
 
       // 任务内容
-      Text(this.taskContent)
+      Text((this.taskContent && this.taskContent !== 'undefined') ? this.taskContent : '（无任务名）')
         .fontSize(16)
         .fontColor('#333')
         .maxLines(2)
@@ -160,14 +206,82 @@ struct FocusPage {
 
       // 倒计时圆圈
       Column() {
-        Text(this.displayMin + ':' + this.displaySec)
-          .fontSize(56)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.isRunning ? '#e74c3c' : '#4a90d9')
+        // 时间显示（非运行态可点击编辑）
+        if (this.isEditingTime) {
+          Row() {
+            TextInput({ text: this.editMinutes, placeholder: '分钟' })
+              .type(InputType.Number)
+              .width(80)
+              .height(48)
+              .fontSize(36)
+              .fontWeight(FontWeight.Bold)
+              .textAlign(TextAlign.Center)
+              .backgroundColor('#f0f0f0')
+              .borderRadius(8)
+              .maxLength(3)
+              .onChange((value: string) => {
+                this.editMinutes = value;
+              })
+              .onSubmit(() => {
+                this.confirmEditTime();
+              })
 
-        // 进度条
+            Text('分钟')
+              .fontSize(18)
+              .fontColor('#999')
+              .margin({ left: 8 })
+          }
+          .justifyContent(FlexAlign.Center)
+        } else {
+          Text(this.formatMin() + ':' + this.formatSec())
+            .fontSize(56)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.isRunning ? '#e74c3c' : '#4a90d9')
+            .onClick(() => { this.startEditTime(); })
+        }
+
+        // 时长调节滑块（非运行态显示）
+        if (!this.isRunning && !this.isComplete && this.sessionId === 0) {
+          Column() {
+            Row() {
+              Text('1分钟')
+                .fontSize(11)
+                .fontColor('#bbb')
+
+              Slider({
+                value: this.focusMinutes,
+                min: 1,
+                max: 120,
+                step: 1
+              })
+                .blockColor('#4a90d9')
+                .trackColor('#e0e0e0')
+                .layoutWeight(1)
+                .margin({ left: 8, right: 8 })
+                .onChange((value: number) => {
+                  this.applyFocusMinutes(value);
+                })
+
+              Text('120分钟')
+                .fontSize(11)
+                .fontColor('#bbb')
+            }
+            .width('80%')
+            .alignItems(VerticalAlign.Center)
+
+            Text(this.focusMinutes + ' 分钟')
+              .fontSize(14)
+              .fontColor('#4a90d9')
+              .fontWeight(FontWeight.Medium)
+              .margin({ top: 4 })
+          }
+          .alignItems(HorizontalAlign.Center)
+          .margin({ top: 12 })
+        }
+
+        // 进度圆环
         Progress({
-          value: this.progress,
+          value: this.formatProgress(),
           total: 100,
           type: ProgressType.Ring
         })

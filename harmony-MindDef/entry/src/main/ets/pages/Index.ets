@@ -1,16 +1,16 @@
 /**
  * MindDef 首页 —— 四象限看板
  *
- * 2×2 网格展示四个象限任务，TabBar 切换统计/我的
+ * 2×2 网格展示四个象限任务，TabBar 切换象限/我的（统计已并入"我的"页）
  */
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
-import { isLoggedIn } from '../utils/TokenUtil';
+import { isLoggedIn, getNickname } from '../utils/TokenUtil';
 import { get, post, put, del } from '../utils/HttpUtil';
 import { TaskModel, getQuadrantInfo, QuadrantInfo } from '../model/TaskModel';
 import { TaskCard } from '../components/TaskCard';
+import { IconLabel } from '../components/IconLabel';
 import { StatsPage } from './StatsPage';
-import { ProfilePage } from './ProfilePage';
 
 @Entry
 @Component
@@ -19,15 +19,21 @@ struct Index {
   @State isLogin: boolean = false;
   @State tasks: TaskModel[] = [];
   @State loading: boolean = true;
-  @State showCreateMenu: boolean = false;
+  @State isDragging: boolean = false;
+  @State dragTask: TaskModel | null = null;
+  @State isSearching: boolean = false;
+  @State searchText: string = '';
+  @State nickname: string = '';
   // selectedTask/showActionMenu 已移除 —— handleLongPress 直接调用 AlertDialog
 
-  // 四个象限元数据
+  // 四个象限元数据（按数轴排列：横轴=紧迫度左低右高，纵轴=重要度上高下低）
+  //  ②(左上)  ①(右上)
+  //  ④(左下)  ③(右下)
   private quadrants: QuadrantInfo[] = [
-    getQuadrantInfo(1),
     getQuadrantInfo(2),
-    getQuadrantInfo(3),
-    getQuadrantInfo(4)
+    getQuadrantInfo(1),
+    getQuadrantInfo(4),
+    getQuadrantInfo(3)
   ];
 
   // ──────────── 生命周期 ────────────
@@ -42,6 +48,8 @@ struct Index {
       router.replaceUrl({ url: 'pages/LoginPage' });
     } else {
       this.isLogin = true;
+      let nick: string = await getNickname();
+      this.nickname = nick || '用户';
       await this.loadTasks();
     }
   }
@@ -66,9 +74,13 @@ struct Index {
    */
   getTasksByQuadrant(quadrant: number): TaskModel[] {
     let result: TaskModel[] = [];
+    let keyword: string = this.searchText.trim().toLowerCase();
     for (let i = 0; i < this.tasks.length; i++) {
-      if (this.tasks[i].quadrant === quadrant) {
-        result.push(this.tasks[i]);
+      let task: TaskModel = this.tasks[i];
+      if (task.quadrant === quadrant) {
+        if (keyword === '' || task.content.toLowerCase().indexOf(keyword) !== -1) {
+          result.push(task);
+        }
       }
     }
     return result;
@@ -81,11 +93,10 @@ struct Index {
       // ③ 象限：快速完成
       this.quickComplete(task);
     } else if (task.quadrant === 1) {
-      // ① 象限：跳转番茄钟
-      router.pushUrl({
-        url: 'pages/FocusPage',
-        params: { taskId: task.id, taskContent: task.content }
-      });
+      // ① 象限：跳转番茄钟（通过 AppStorage 传参，绕过 router 序列化问题）
+      AppStorage.setOrCreate('focus_taskId', task.id ?? 0);
+      AppStorage.setOrCreate('focus_taskContent', task.content ?? '');
+      router.pushUrl({ url: 'pages/FocusPage' });
     } else if (task.quadrant === 2) {
       // ② 象限：排日程
       this.showScheduleDialog(task);
@@ -111,6 +122,14 @@ struct Index {
         action: () => {}
       },
       buttons: [
+        {
+          value: '番茄钟',
+          action: () => {
+            AppStorage.setOrCreate('focus_taskId', capturedTask.id ?? 0);
+            AppStorage.setOrCreate('focus_taskContent', capturedTask.content ?? '');
+            router.pushUrl({ url: 'pages/FocusPage' });
+          }
+        },
         {
           value: '移到①立刻做',
           action: () => { this.moveToQuadrant(capturedTask, 1); }
@@ -153,129 +172,273 @@ struct Index {
   }
 
   async deleteTask(task: TaskModel): Promise<void> {
-    let result: object | null = await del('/api/task/' + task.id);
-    if (result !== null) {
-      promptAction.showToast({ message: '已删除', duration: 1000 });
+    await del('/api/task/' + task.id);
+    promptAction.showToast({ message: '已删除', duration: 1000 });
+    await this.loadTasks();
+  }
+
+  async showScheduleDialog(task: TaskModel): Promise<void> {
+    let selectedDate: Date = task.scheduledDate ? new Date(task.scheduledDate) : new Date();
+    DatePickerDialog.show({
+      start: new Date(),
+      end: new Date(new Date().getFullYear() + 2, 11, 31),
+      selected: selectedDate,
+      lunar: false,
+      onAccept: (value: DatePickerResult) => {
+        let m: number = value.month! + 1;  // month 0-indexed
+        let month: string = m < 10 ? '0' + m : String(m);
+        let day: string = (value.day! < 10 ? '0' + value.day : String(value.day));
+        let dateStr: string = value.year + '-' + month + '-' + day;
+        this.saveSchedule(task, dateStr);
+      }
+    });
+  }
+
+  async saveSchedule(task: TaskModel, dateStr: string): Promise<void> {
+    let scheduleData: Record<string, string> = { 'scheduledDate': dateStr };
+    let data: object | null = await put('/api/task/' + task.id + '/schedule', scheduleData);
+    if (data) {
+      promptAction.showToast({ message: '已排程 ' + dateStr, duration: 1500 });
       await this.loadTasks();
     }
   }
 
-  async showScheduleDialog(task: TaskModel): Promise<void> {
-    // 暂用 Toast 代替（Phase 4 实现完整的日期选择器）
-    promptAction.showToast({ message: '排程功能将在 Phase 4 实现', duration: 1500 });
+  // ──────────── 拖拽删除 ────────────
+
+  /**
+   * 拖拽时跟随手指的预览卡片
+   */
+  @Builder
+  buildDragPreview() {
+    Column() {
+      Text(this.dragTask?.content || '')
+        .fontSize(13)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .backgroundColor('#ffffff')
+        .borderRadius(8)
+        .shadow({ radius: 6, color: '#40000000' })
+    }
   }
 
-  // ──────────── 操作菜单 ────────────
-
-  // ──────────── 创建菜单 ────────────
-
-  buildCreateMenu(): void {
-    AlertDialog.show({
-      title: '创建事项',
-      message: '选择创建方式',
-      autoCancel: true,
-      alignment: DialogAlignment.Bottom,
-      primaryButton: {
-        value: '📝 手动输入',
-        action: () => {
-          router.pushUrl({ url: 'pages/SliderCreatePage' });
-        }
-      },
-      secondaryButton: {
-        value: '取消',
-        action: () => {}
-      },
-      buttons: [
-        {
-          value: '📋 粘贴识别',
-          action: () => {
-            router.pushUrl({ url: 'pages/AiParsePage' });
-          }
-        },
-        {
-          value: '💬 帮我判断',
-          action: () => {
-            router.pushUrl({ url: 'pages/GuideCreatePage' });
-          }
-        }
-      ]
-    });
+  /**
+   * 拖拽时底部浮现的垃圾桶
+   */
+  @Builder
+  buildTrashZone() {
+    Column() {
+      Image($r('app.media.icon_trash'))
+        .width(40)
+        .height(40)
+        .fillColor('#ffffff')
+      Text('拖到这里删除')
+        .fontSize(12)
+        .fontColor('#ffffff')
+        .margin({ top: 2 })
+    }
+    .width('88%')
+    .height(66)
+    .backgroundColor('#e74c3c')
+    .borderRadius(16)
+    .justifyContent(FlexAlign.Center)
+    .opacity(0.88)
+    .position({ x: '6%', y: '90%' })
+    .shadow({ radius: 12, color: '#60000000' })
+    .onDrop((event: DragEvent) => {
+      if (this.dragTask !== null) {
+        let task: TaskModel = this.dragTask;
+        this.deleteTask(task);
+      }
+    })
   }
+
 
   // ──────────── 构建界面 ────────────
 
   build() {
     if (this.isLogin) {
       Stack() {
-        Tabs({ index: this.currentTab }) {
-          // ── Tab 1: 象限看板 ──
-          TabContent() {
-            if (this.loading) {
-              Column() {
-                LoadingProgress()
-                  .width(40)
-                  .height(40)
-                Text('加载中...')
-                  .fontSize(14)
-                  .fontColor('#999')
-                  .margin({ top: 8 })
-              }
-              .width('100%')
-              .height('100%')
-              .justifyContent(FlexAlign.Center)
-            } else {
-              Column() {
-                // 2×2 象限网格
-                Grid() {
-                  ForEach(this.quadrants, (qi: QuadrantInfo, index: number) => {
-                    GridItem() {
-                      this.buildQuadrantCell(qi);
-                    }
-                  })
+        Column() {
+          Tabs({ index: this.currentTab }) {
+            // ── Tab 1: 象限看板 ──
+            TabContent() {
+              if (this.loading) {
+                Column() {
+                  LoadingProgress()
+                    .width(40)
+                    .height(40)
+                  Text('加载中...')
+                    .fontSize(14)
+                    .fontColor('#999')
+                    .margin({ top: 8 })
                 }
-                .columnsTemplate('1fr 1fr')
-                .rowsTemplate('1fr 1fr')
                 .width('100%')
                 .height('100%')
-                .padding(8)
-                .backgroundColor('#f5f5f5')
+                .justifyContent(FlexAlign.Center)
+              } else {
+                Column() {
+                  // ── 功能栏 ──
+                  if (this.isSearching) {
+                    Row() {
+                      TextInput({ placeholder: '搜索任务…' })
+                        .layoutWeight(1)
+                        .height(36)
+                        .fontSize(15)
+                        .backgroundColor('#f5f5f5')
+                        .borderRadius(8)
+                        .onChange((v: string) => { this.searchText = v; })
+
+                      Image($r('app.media.icon_close'))
+                        .width(18)
+                        .height(18)
+                        .fillColor('#999')
+                        .padding({ left: 10, right: 4 })
+                        .onClick(() => {
+                          this.isSearching = false;
+                          this.searchText = '';
+                        })
+                    }
+                    .width('100%')
+                    .padding({ left: 16, right: 16, top: 10, bottom: 8 })
+                    .backgroundColor('#ffffff')
+                  } else {
+                    Row() {
+                      IconLabel({
+                        icon: $r('app.media.icon_brain'),
+                        label: '脑袋def',
+                        iconSize: 22,
+                        fontSize: 18,
+                        fontColor: '#333',
+                        iconColor: '#4a90d9',
+                        fontWeight: FontWeight.Bold,
+                        spacing: 6
+                      })
+
+                      Blank()
+
+                      Image($r('app.media.icon_search'))
+                        .width(32)
+                        .height(32)
+                        .padding({ left: 8, right: 4 })
+                        .onClick(() => { this.isSearching = true; })
+                    }
+                    .width('100%')
+                    .padding({ left: 16, right: 16, top: 12, bottom: 10 })
+                    .backgroundColor('#ffffff')
+                  }
+
+                  // 2×2 象限网格
+                  Grid() {
+                    ForEach(this.quadrants, (qi: QuadrantInfo, index: number) => {
+                      GridItem() {
+                        this.buildQuadrantCell(qi);
+                      }
+                    })
+                  }
+                  .columnsTemplate('1fr 1fr')
+                  .rowsTemplate('1fr 1fr')
+                  .width('100%')
+                  .height('100%')
+                  .padding(8)
+                  .backgroundColor('#f5f5f5')
+                }
+                .width('100%')
+                .height('100%')
+              }
+            }
+
+            // ── Tab 2: 我的 ──
+            TabContent() {
+              Column() {
+                // 用户信息行
+                Row() {
+                  Image($r('app.media.icon_user'))
+                    .width(32)
+                    .height(32)
+                    .fillColor('#4a90d9')
+                    .margin({ right: 10 })
+
+                  Text(this.nickname || '用户')
+                    .fontSize(17)
+                    .fontColor('#333')
+                    .fontWeight(FontWeight.Medium)
+                    .layoutWeight(1)
+
+                  Image($r('app.media.icon_forward'))
+                    .width(16)
+                    .height(16)
+                    .fillColor('#999')
+                }
+                .width('100%')
+                .padding({ left: 20, right: 20, top: 64, bottom: 14 })
+                .backgroundColor('#ffffff')
+                .onClick(() => {
+                  router.pushUrl({ url: 'pages/ProfilePage' });
+                })
+                .hitTestBehavior(HitTestMode.Block)
+
+                Divider()
+
+                // 统计
+                StatsPage()
               }
               .width('100%')
               .height('100%')
+              .backgroundColor('#f8f8f8')
             }
           }
-          .tabBar('象限')
+          .width('100%')
+          .layoutWeight(1)
+          .barHeight(0)       // 隐藏原生 TabBar
+          .barPosition(BarPosition.End)
 
-          // ── Tab 2: 统计 ──
-          TabContent() {
-            StatsPage()
-          }
-          .tabBar('统计')
+          // ── 自定义底部栏：象限 | ＋ | 我的 ──
+          Row() {
+            Text('象限')
+              .fontSize(15)
+              .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 0 ? '#4a90d9' : '#999')
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+              .onClick(() => { this.currentTab = 0; })
 
-          // ── Tab 3: 我的 ──
-          TabContent() {
-            ProfilePage()
+            // ＋ 创建按钮
+            Button('+')
+              .width(48)
+              .height(48)
+              .fontSize(26)
+              .fontWeight(FontWeight.Lighter)
+              .backgroundColor('#4a90d9')
+              .fontColor('#ffffff')
+              .borderRadius(24)
+              .shadow({ radius: 6, color: '#604a90d9' })
+              .margin({ bottom: 8 })
+              .onClick(() => {
+                router.pushUrl({ url: 'pages/SliderCreatePage' });
+              })
+
+            Text('我的')
+              .fontSize(15)
+              .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 1 ? '#4a90d9' : '#999')
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+              .onClick(() => { this.currentTab = 1; })
           }
-          .tabBar('我的')
+          .width('100%')
+          .backgroundColor('#ffffff')
+          .padding({ left: 16, right: 16, bottom: 8 })
         }
         .width('100%')
         .height('100%')
-        .barPosition(BarPosition.End)
 
-        // ── 悬浮创建按钮 ──
-        Button('+')
-          .width(56)
-          .height(56)
-          .fontSize(28)
-          .fontWeight(FontWeight.Lighter)
-          .backgroundColor('#4a90d9')
-          .fontColor('#ffffff')
-          .borderRadius(28)
-          .position({ x: '80%', y: '82%' })
-          .shadow({ radius: 8, color: '#33000000' })
-          .onClick(() => {
-            this.buildCreateMenu();
-          })
+        // ── 拖拽垃圾桶（拖拽中浮现）──
+        if (this.isDragging) {
+          this.buildTrashZone();
+        }
       }
       .width('100%')
       .height('100%')
@@ -330,9 +493,19 @@ struct Index {
             TaskCard({
               task: task,
               onTap: (t: TaskModel) => { this.handleTaskTap(t); },
-              onLongPress: (t: TaskModel) => { this.handleLongPress(t); }
+              onMenuTap: (t: TaskModel) => { this.handleLongPress(t); }
             })
           }
+          .draggable(true) // 全象限支持拖拽删除
+          .onDragStart((event: DragEvent) => {
+            this.isDragging = true;
+            this.dragTask = task;
+            return this.buildDragPreview;
+          })
+          .onDragEnd((event: DragEvent) => {
+            this.isDragging = false;
+            this.dragTask = null;
+          })
         })
       }
       .width('100%')

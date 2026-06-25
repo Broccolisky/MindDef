@@ -8,6 +8,7 @@ import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { post } from '../utils/HttpUtil';
 import { calcQuadrant, getAdvice } from '../model/TaskModel';
+import { IconLabel } from '../components/IconLabel';
 
 @Entry
 @Component
@@ -18,21 +19,31 @@ struct GuideCreatePage {
   @State importance: number = 50;
   @State loading: boolean = false;   // 防重复提交
 
-  get quadrant(): number {
-    return calcQuadrant(this.importance, this.urgency);
-  }
+  // 不使用 get 访问器——@Builder 方法无法访问 class getter（ArkTS API 24 限制）
+  // 改为在各 @Builder 内部直接调用 calcQuadrant / getAdvice
 
-  get advice(): string {
-    return getAdvice(this.quadrant);
+  aboutToAppear(): void {
+    // 从统一创建页跳转时预填内容
+    let gc: string | undefined = AppStorage.get('guide_content') as string | undefined;
+    if (gc !== undefined && gc !== null && gc !== '') {
+      this.content = gc;
+      AppStorage.delete('guide_content');
+    }
   }
 
   build() {
     Column() {
       // ── 标题栏 ──
       Row() {
-        Text('← 返回')
-          .fontSize(14)
-          .fontColor('#4a90d9')
+        IconLabel({
+          icon: $r('app.media.icon_back'),
+          label: '返回',
+          iconSize: 16,
+          fontSize: 14,
+          iconColor: '#4a90d9',
+          fontColor: '#4a90d9',
+          spacing: 2
+        })
           .onClick(() => { router.back(); })
 
         Blank()
@@ -183,19 +194,20 @@ struct GuideCreatePage {
         .margin({ top: 40, bottom: 24 })
 
       // 内容展示
-      Text(this.content)
+      Text((this.content && this.content !== 'undefined' && this.content !== 'null') ? this.content : '（未填写）')
         .fontSize(16)
         .fontColor('#333')
         .margin({ bottom: 16 })
 
-      // 判定卡片
+      // 判定卡片（直接內联计算——@Builder 无法访问 class getter，也不能声明 let）
       Column() {
-        Text('当前判定：' + this.quadrant + ' ' + this.advice)
+        Text('象限 ' + calcQuadrant(this.importance, this.urgency)
+          + ' · ' + getAdvice(calcQuadrant(this.importance, this.urgency)))
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor('#4a90d9')
 
-        Text('建议：' + this.advice)
+        Text('建议：' + getAdvice(calcQuadrant(this.importance, this.urgency)))
           .fontSize(14)
           .fontColor('#999')
           .margin({ top: 8 })
@@ -230,11 +242,11 @@ struct GuideCreatePage {
         .margin({ bottom: 40 })
         .onClick(() => {
           // 跳转到滑块页微调（带预填内容）
-          router.replaceUrl({ url: 'pages/SliderCreatePage', params: {
-            content: this.content,
-            importance: this.importance,
-            urgency: this.urgency
-          }});
+          // 通过 AppStorage 传参到滑块页（绕过 router 序列化 bug）
+          AppStorage.setOrCreate('slider_content', this.content || '');
+          AppStorage.setOrCreate('slider_importance', this.importance || 50);
+          AppStorage.setOrCreate('slider_urgency', this.urgency || 50);
+          router.pushUrl({ url: 'pages/SliderCreatePage' });
         })
     }
     .width('100%')
@@ -252,9 +264,10 @@ struct GuideCreatePage {
         .fontColor('#333')
         .layoutWeight(1)
 
-      Text('→')
-        .fontSize(16)
-        .fontColor('#ccc')
+      Image($r('app.media.icon_forward'))
+        .width(16)
+        .height(16)
+        .fillColor('#ccc')
     }
     .width('100%')
     .height(52)

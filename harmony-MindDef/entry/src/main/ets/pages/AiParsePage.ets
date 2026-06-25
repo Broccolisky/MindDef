@@ -6,17 +6,7 @@
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { post } from '../utils/HttpUtil';
-
-// AI 解析结果项
-class AiTaskItem {
-  content: string = '';
-  importance: number = 50;
-  urgency: number = 50;
-  deadline: string | null = null;
-  quadrant: number = 1;
-  advice: string = '';
-  confirmed: boolean = false;
-}
+import { AiTaskItem } from '../model/TaskModel';
 
 @Entry
 @Component
@@ -248,15 +238,12 @@ struct AiParsePage {
             .borderRadius(16)
             .margin({ left: 8 })
             .onClick(() => {
-              router.pushUrl({
-                url: 'pages/SliderCreatePage',
-                params: {
-                  content: item.content,
-                  importance: item.importance,
-                  urgency: item.urgency,
-                  deadline: item.deadline
-                }
-              });
+              // 通过 AppStorage 传参到滑块页（绕过 router 序列化 bug）
+              AppStorage.setOrCreate('slider_content', item.content || '');
+              AppStorage.setOrCreate('slider_importance', item.importance || 50);
+              AppStorage.setOrCreate('slider_urgency', item.urgency || 50);
+              AppStorage.setOrCreate('slider_deadline', item.deadline ?? '');
+              router.pushUrl({ url: 'pages/SliderCreatePage' });
             })
         }
       }

@@ -11,7 +11,7 @@ import { preferences } from '@kit.ArkData';
 import { promptAction } from '@kit.ArkUI';
 import { router } from '@kit.ArkUI';
 
-const BASE_URL: string = 'http://10.0.2.2:8080'; // 模拟器映射本地 8080 端口
+const BASE_URL: string = 'http://47.239.55.169:8080'; // 远程服务器
 const PREF_NAME: string = 'minddef_prefs';
 
 /**
