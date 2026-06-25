@@ -1,7 +1,7 @@
 /**
  * MindDef 首页 —— 四象限看板
  *
- * 2×2 网格展示四个象限任务，TabBar 切换象限/我的（统计已并入"我的"页）
+ * 2×2 网格展示四个象限任务，TabBar 切换象限/助手/我的
  */
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
@@ -11,6 +11,7 @@ import { TaskModel, getQuadrantInfo, QuadrantInfo } from '../model/TaskModel';
 import { TaskCard } from '../components/TaskCard';
 import { IconLabel } from '../components/IconLabel';
 import { StatsPage } from './StatsPage';
+import { AiChatPage } from './AiChatPage';
 
 @Entry
 @Component
@@ -44,7 +45,8 @@ struct Index {
   }
 
   onTabChange(): void {
-    if (this.currentTab === 1) {
+    // "我的" Tab 现在是索引 2（0=象限, 1=助手, 2=我的）
+    if (this.currentTab === 2) {
       this.statsRefreshKey++;
     }
   }
@@ -417,7 +419,12 @@ struct Index {
               }
             }
 
-            // ── Tab 2: 我的 ──
+            // ── Tab 2: 助手 ──
+            TabContent() {
+              AiChatPage()
+            }
+
+            // ── Tab 3: 我的 ──
             TabContent() {
               Column() {
                 // 用户信息行
@@ -456,7 +463,7 @@ struct Index {
                 .layoutWeight(1)
 
                 // 版本号
-                Text('v0.7.2')
+                Text('v0.8.1')
                   .fontSize(12)
                   .fontColor('#bbb')
                   .padding({ bottom: 8 })
@@ -472,7 +479,7 @@ struct Index {
           .barHeight(0)       // 隐藏原生 TabBar
           .barPosition(BarPosition.End)
 
-          // ── 自定义底部栏：象限 | ＋ | 我的 ──
+          // ── 自定义底部栏：象限 | 助手 | ＋ | 我的 ──
           Row() {
             Text('象限')
               .fontSize(15)
@@ -482,6 +489,15 @@ struct Index {
               .textAlign(TextAlign.Center)
               .padding({ top: 12, bottom: 12 })
               .onClick(() => { this.currentTab = 0; })
+
+            Text('助手')
+              .fontSize(15)
+              .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 1 ? '#4a90d9' : '#999')
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+              .onClick(() => { this.currentTab = 1; })
 
             // ＋ 创建按钮
             Button('+')
@@ -500,12 +516,12 @@ struct Index {
 
             Text('我的')
               .fontSize(15)
-              .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.currentTab === 1 ? '#4a90d9' : '#999')
+              .fontWeight(this.currentTab === 2 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 2 ? '#4a90d9' : '#999')
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
               .padding({ top: 12, bottom: 12 })
-              .onClick(() => { this.currentTab = 1; })
+              .onClick(() => { this.currentTab = 2; })
           }
           .width('100%')
           .backgroundColor('#ffffff')

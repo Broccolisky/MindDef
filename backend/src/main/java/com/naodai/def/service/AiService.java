@@ -5,8 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.naodai.def.common.BusinessException;
 import com.naodai.def.common.ResultCode;
 import com.naodai.def.dto.AiTaskItem;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.naodai.def.entity.Faq;
+import com.naodai.def.entity.Task;
 import com.naodai.def.mapper.FaqMapper;
+import com.naodai.def.mapper.TaskMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +24,7 @@ import javax.annotation.Resource;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.stream.Collectors;
 
 /**
  * AI 服务 —— DeepSeek API 调用封装
@@ -49,6 +53,12 @@ public class AiService {
 
     @Resource
     private FaqMapper faqMapper;
+
+    @Resource
+    private StatsService statsService;
+
+    @Resource
+    private TaskMapper taskMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate;
@@ -152,6 +162,7 @@ public class AiService {
 
     /**
      * FAQ 知识库问答 —— 先匹配本地 FAQ，无匹配则调用 DeepSeek
+     * 系统提示词会注入用户当前的任务状态和统计数据
      */
     public String chat(Long userId, String question) {
         // 频率检查
@@ -163,16 +174,86 @@ public class AiService {
             return faqAnswer;
         }
 
-        // 第二步：DeepSeek 兜底
-        String systemPrompt = "你是 MindDef 任务管理应用的 AI 助手。请用简洁友好的方式回答用户的问题，" +
-                "回答控制在 200 字以内。MindDef 是一款基于艾森豪威尔矩阵的决策型任务管理应用，通过重要性×紧急性" +
-                "双维度帮你判断每件事该立刻做、计划做、简化做还是不做。";
+        // 第二步：DeepSeek 兜底（动态系统提示词含用户任务上下文）
+        String systemPrompt = buildSystemPrompt(userId);
 
         try {
             return callDeepSeek(systemPrompt, question, false);
         } catch (Exception e) {
             log.error("AI 问答异常", e);
             return "抱歉，AI 服务暂时不可用，请稍后重试。您也可以在「使用指南」中查找帮助信息。";
+        }
+    }
+
+    /**
+     * 构建带用户任务上下文的系统提示词
+     */
+    private String buildSystemPrompt(Long userId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("你是 MindDef 任务管理应用的 AI 助手。");
+        sb.append("MindDef 基于艾森豪威尔矩阵，通过重要性×紧急性双维度将任务分为四象限：");
+        sb.append("①立刻做（重要+紧急）②计划做（重要+不紧急）③简化做（不重要+紧急）④不做（不重要+不紧急）。");
+        sb.append("请用简洁友好的方式回答用户问题，控制在 200 字以内。");
+
+        try {
+            // 注入用户任务统计
+            Map<String, Object> stats = statsService.overview(userId);
+            if (stats != null && !stats.isEmpty()) {
+                sb.append("\n\n## 用户当前任务统计\n");
+                sb.append("- 总任务: ").append(stats.getOrDefault("total", 0)).append(" 条");
+                sb.append("（已完成: ").append(stats.getOrDefault("completed", 0));
+                sb.append("，已放弃: ").append(stats.getOrDefault("abandoned", 0)).append("）\n");
+
+                @SuppressWarnings("unchecked")
+                Map<Integer, Integer> dist = (Map<Integer, Integer>) stats.get("quadrantDistribution");
+                if (dist != null) {
+                    sb.append("- ①立刻做: ").append(dist.getOrDefault(1, 0)).append(" 条  ");
+                    sb.append("②计划做: ").append(dist.getOrDefault(2, 0)).append(" 条  ");
+                    sb.append("③简化做: ").append(dist.getOrDefault(3, 0)).append(" 条  ");
+                    sb.append("④不做: ").append(dist.getOrDefault(4, 0)).append(" 条\n");
+                }
+                sb.append("- 本周完成: ").append(stats.getOrDefault("thisWeek", 0)).append(" 条  ");
+                sb.append("本月完成: ").append(stats.getOrDefault("thisMonth", 0)).append(" 条\n");
+            }
+
+            // 注入活跃任务列表（top 10，优先 Q1 + 有 deadline 的）
+            LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Task::getUserId, userId)
+                   .in(Task::getStatus, 0, 1)  // 待办 + 进行中
+                   .orderByAsc(Task::getQuadrant)
+                   .orderByDesc(Task::getImportance)
+                   .last("LIMIT 10");
+            List<Task> activeTasks = taskMapper.selectList(wrapper);
+
+            if (activeTasks != null && !activeTasks.isEmpty()) {
+                sb.append("\n## 用户待处理任务（部分）\n");
+                for (Task t : activeTasks) {
+                    sb.append("- [").append(getQuadrantName(t.getQuadrant())).append("] ");
+                    sb.append(t.getContent());
+                    if (t.getDeadline() != null) {
+                        sb.append("（截止: ").append(t.getDeadline()).append("）");
+                    }
+                    sb.append("\n");
+                }
+            }
+
+            sb.append("\n基于以上数据，若用户询问任务建议/优先级/安排等问题，请结合其实际任务状况给出个性化建议。");
+            sb.append("若用户问的是通用问题，正常回答即可。");
+
+        } catch (Exception e) {
+            log.warn("构建任务上下文失败，使用基础系统提示词", e);
+        }
+
+        return sb.toString();
+    }
+
+    private String getQuadrantName(int q) {
+        switch (q) {
+            case 1: return "①立刻做";
+            case 2: return "②计划做";
+            case 3: return "③简化做";
+            case 4: return "④不做";
+            default: return "象限" + q;
         }
     }
 

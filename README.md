@@ -202,7 +202,7 @@ devecocli run
 
 | 页面 | 文件 | 路由 |
 |------|------|------|
-| 首页(四象限) | `Index.ets` | `pages/Index`（入口，含"我的"Tab） |
+| 首页(四象限) | `Index.ets` | `pages/Index`（入口，含"助手""我的"Tab） |
 | 登录 | `LoginPage.ets` | `pages/LoginPage` |
 | 注册 | `RegisterPage.ets` | `pages/RegisterPage` |
 | 统一创建页 | `SliderCreatePage.ets` | `pages/SliderCreatePage`（新建+编辑双模式 / 手动+AI+引导入口 / 重复芯片） |
@@ -210,8 +210,9 @@ devecocli run
 | 番茄钟 | `FocusPage.ets` | `pages/FocusPage`（1-120 分钟可调，环形进度） |
 | 个人中心 | `ProfilePage.ets` | `pages/ProfilePage`（从"我的"Tab头像进入，修改昵称/密码/退出） |
 | 统计 | `StatsPage.ets` | 嵌入在 Index.ets"我的"Tab中（累计/分布/周月趋势） |
+| AI 助手 | `AiChatPage.ets` | 嵌入在 Index.ets"助手"Tab中（基于任务数据的智能对话） |
 
-> 注：AiParsePage 已整合进 SliderCreatePage 的 AI 面板，不再独立注册；StatsPage 作为子组件嵌入 Index.ets"我的"Tab 中。共 **7 个注册页面** + 1 个嵌入式统计组件。
+> 注：AiParsePage 已整合进 SliderCreatePage 的 AI 面板，不再独立注册；StatsPage 和 AiChatPage 作为子组件嵌入 Index.ets 的 Tab 中。共 **7 个注册页面** + 2 个嵌入式组件。
 
 ---
 
@@ -226,7 +227,8 @@ devecocli run
 7. **AI 知识库问答** — FAQ 关键词匹配优先 → DeepSeek 兜底，频率限制 10 次/分钟
 8. **番茄钟** — 1-120 分钟可调专注倒计时，环形进度条，记录专注时长
 9. **决策统计** — 累计/完成/放弃 + 四象限分布 + 周/月完成统计
-10. **JWT 安全认证** — BCrypt 密码加密、Token 24h 有效期、归属校验（403 拦截越权）
+10. **AI 任务助手** — 基于用户实际任务数据提供个性化建议，支持多轮对话（"我今天该先做什么？"）
+11. **JWT 安全认证** — BCrypt 密码加密、Token 24h 有效期、归属校验（403 拦截越权）
 
 ---
 
@@ -247,6 +249,7 @@ devecocli run
 | `router` (pushUrl/replaceUrl/back) | 页面导航 |
 | `AppStorage` | 跨页面参数传递（编辑模式/番茄钟入口） |
 | `.draggable()` / `.onDrop()` / `.onDragStart()` | 拖拽至番茄钟/完成/删除区域 |
+| `Scroller` + `scrollEdge()` | AI 聊天消息列表自动滚底 |
 
 ---
 
@@ -265,6 +268,11 @@ devecocli run
 ---
 
 ## 已知问题与修复记录
+
+### v0.8.0 新增
+> - AI 助手页面（"助手"Tab）：基于用户任务数据提供个性化建议，支持多轮对话
+> - 后端 AiService.chat() 注入 StatsService + TaskMapper，动态构建含任务上下文的 system prompt
+> - 底部栏三 Tab：象限 | 助手 | ＋ | 我的
 
 ### v0.7.1 新增
 > - 单击任务 → 编辑页（统一四象限交互，替代旧版分象限差异化行为）
@@ -305,4 +313,4 @@ A: 详见 `deploy/README.md`。后端使用 systemd 管理：`systemctl restart 
 
 ---
 
-> 最后更新：2026-06-26 · MindDef v0.7.2 · GitHub: https://github.com/Broccolisky/MindDef
+> 最后更新：2026-06-26 · MindDef v0.8.1 · GitHub: https://github.com/Broccolisky/MindDef

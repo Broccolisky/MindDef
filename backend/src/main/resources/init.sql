@@ -95,8 +95,12 @@ INSERT INTO task (user_id, content, importance, urgency, quadrant, deadline, sou
 -- ③ 象限：简化做
 (1, '回复群消息',                 30, 80, 3, NULL,         1, 0, NULL,                NOW()),
 (1, '整理上周会议纪要',            40, 70, 3, '2026-06-23', 1, 2, NULL,                NOW()),
+(1, '批量处理邮件',               35, 65, 3, NULL,         1, 0, NULL,                NOW()),
+(1, '填写报销单',                 20, 75, 3, '2026-06-28', 1, 0, NULL,                NOW()),
 -- ④ 象限：不做
 (1, '刷短视频',                   10, 10, 4, NULL,         1, 3, NULL,                NOW()),
+(1, '逛淘宝',                     15,  5, 4, NULL,         1, 3, NULL,                NOW()),
+(1, '追剧',                        5, 15, 4, NULL,         1, 3, NULL,                NOW()),
 
 -- demo 的测试事项
 (2, '完成高数作业',               70, 85, 1, '2026-06-24', 1, 0, NULL,                NOW()),
