@@ -456,7 +456,7 @@ struct Index {
                 .layoutWeight(1)
 
                 // 版本号
-                Text('v0.7.1')
+                Text('v0.7.2')
                   .fontSize(12)
                   .fontColor('#bbb')
                   .padding({ bottom: 8 })

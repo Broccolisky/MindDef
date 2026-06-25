@@ -120,7 +120,7 @@ struct SliderCreatePage {
       Scroll() {
         Column() {
           // ── 内容输入 ──
-          TextArea({ placeholder: '输入事项内容...' })
+          TextArea({ text: this.content, placeholder: '输入事项内容...' })
             .width('100%')
             .height(120)
             .fontSize(16)
