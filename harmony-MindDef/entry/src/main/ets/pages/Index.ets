@@ -47,7 +47,7 @@ struct Index {
 
   onTabChange(): void {
     // 0=象限, 1=视图, 2=助手, 3=我的
-    if (this.currentTab === 3) {
+    if (this.currentTab === 1 || this.currentTab === 3) {
       this.statsRefreshKey++;
     }
   }
@@ -88,6 +88,8 @@ struct Index {
     let keyword: string = this.searchText.trim().toLowerCase();
     for (let i = 0; i < this.tasks.length; i++) {
       let task: TaskModel = this.tasks[i];
+      // 只显示活跃任务，过滤已完成和已删除
+      if (task.status === 2 || task.status === 3) continue;
       if (task.quadrant === quadrant) {
         if (keyword === '' || task.content.toLowerCase().indexOf(keyword) !== -1) {
           result.push(task);
@@ -164,11 +166,9 @@ struct Index {
   }
 
   async quickComplete(task: TaskModel): Promise<void> {
-    let data: Record<string, Object> | null = await put('/api/task/' + task.id + '/complete') as Record<string, Object> | null;
-    if (data) {
-      promptAction.showToast({ message: '已完成', duration: 1000 });
-      await this.loadTasks();
-    }
+    await put('/api/task/' + task.id + '/complete');
+    promptAction.showToast({ message: '已完成', duration: 1000 });
+    await this.loadTasks();
   }
 
   async moveToQuadrant(task: TaskModel, targetQuadrant: number): Promise<void> {
@@ -422,7 +422,7 @@ struct Index {
 
             // ── Tab 2: 视图 ──
             TabContent() {
-              CalendarPage()
+              CalendarPage({ refreshKey: this.statsRefreshKey })
             }
 
             // ── Tab 3: 助手 ──
@@ -469,7 +469,7 @@ struct Index {
                 .layoutWeight(1)
 
                 // 版本号
-                Text('v0.9.3')
+                Text('v0.9.5')
                   .fontSize(12)
                   .fontColor('#bbb')
                   .padding({ bottom: 8 })
@@ -618,10 +618,13 @@ struct Index {
             return this.buildDragPreview;
           })
           .onDragEnd((event: DragEvent) => {
-            this.isDragging = false;
-            this.dragTask = null;
+            // 延迟清除拖拽状态，让 onDrop 先触发
+            setTimeout(() => {
+              this.isDragging = false;
+              this.dragTask = null;
+            }, 150);
           })
-        })
+        }, (task: TaskModel) => (task.id ?? 0).toString())
       }
       .width('100%')
       .layoutWeight(1)

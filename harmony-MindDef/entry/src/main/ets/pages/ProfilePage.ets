@@ -38,15 +38,13 @@ export struct ProfilePage {
       return;
     }
     let nickData: Record<string, string> = { 'nickname': this.newNickname.trim() };
-    let data: object | null = await put('/api/user/nickname', nickData);
-    if (data) {
-      this.nickname = this.newNickname.trim();
-      this.isEditingNickname = false;
-      let token: string = await getToken();
-      let userId: number = await getUserId();
-      await saveLoginInfo(token, userId, this.nickname);
-      promptAction.showToast({ message: '昵称修改成功', duration: 1000 });
-    }
+    await put('/api/user/nickname', nickData);
+    this.nickname = this.newNickname.trim();
+    this.isEditingNickname = false;
+    let token: string = await getToken();
+    let userId: number = await getUserId();
+    await saveLoginInfo(token, userId, this.nickname);
+    promptAction.showToast({ message: '昵称修改成功', duration: 1000 });
   }
 
   async doUpdatePassword(): Promise<void> {
@@ -62,13 +60,11 @@ export struct ProfilePage {
       'oldPassword': this.oldPwd,
       'newPassword': this.newPwd
     };
-    let data: object | null = await put('/api/user/password', pwdData);
-    if (data) {
-      this.isEditingPwd = false;
-      this.oldPwd = '';
-      this.newPwd = '';
-      promptAction.showToast({ message: '密码修改成功', duration: 1000 });
-    }
+    await put('/api/user/password', pwdData);
+    this.isEditingPwd = false;
+    this.oldPwd = '';
+    this.newPwd = '';
+    promptAction.showToast({ message: '密码修改成功', duration: 1000 });
   }
 
   async doLogout(): Promise<void> {

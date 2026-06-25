@@ -16,12 +16,17 @@ class DayCell {
 
 @Component
 export struct CalendarPage {
+  @Prop @Watch('onRefresh') refreshKey: number = 0;
   @State calendarData: Record<string, TaskModel[]> = {};
   @State currentYear: number = new Date().getFullYear();
   @State currentMonth: number = new Date().getMonth() + 1;
   @State selectedDate: string = '';
   @State weeks: DayCell[][] = [];
   @State loading: boolean = false;
+
+  onRefresh(): void {
+    this.loadCalendar();
+  }
 
   aboutToAppear(): void {
     let today: Date = new Date();

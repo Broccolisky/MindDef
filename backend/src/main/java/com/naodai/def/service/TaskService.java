@@ -1,6 +1,7 @@
 package com.naodai.def.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.naodai.def.common.BusinessException;
 import com.naodai.def.common.ResultCode;
 import com.naodai.def.dto.*;
@@ -224,9 +225,13 @@ public class TaskService {
         if (task.getStatus() == 2) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "该事项已完成");
         }
+        // 使用 LambdaUpdateWrapper 绕过 MyBatis-Plus logic-delete-field 对 status 的剥离
+        taskMapper.update(null, new LambdaUpdateWrapper<Task>()
+            .eq(Task::getId, taskId)
+            .set(Task::getStatus, 2)
+            .set(Task::getCompletedAt, LocalDateTime.now()));
         task.setStatus(2);
         task.setCompletedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
         return task;
     }
 

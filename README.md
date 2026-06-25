@@ -28,8 +28,8 @@ MindDef__Workspace/
 ├── MindDef/
 │   ├── backend/                 # Spring Boot 后端
 │   │   ├── src/main/java/com/naodai/def/
-│   │   │   ├── controller/      # 接口层 (6 个)
-│   │   │   ├── service/         # 业务层 (6 个)
+│   │   │   ├── controller/      # 接口层 (7 个)
+│   │   │   ├── service/         # 业务层 (7 个)
 │   │   │   ├── mapper/          # 数据层 (4 个)
 │   │   │   ├── entity/          # 数据库实体 (4 个)
 │   │   │   ├── dto/             # 数据传输对象 (13 个)
@@ -133,7 +133,7 @@ devecocli run
 
 ## API 端点一览
 
-共 **17 个接口**，分为 5 组：
+共 **18 个接口**，分为 6 组：
 
 ### 01-认证（无需 Token）
 
@@ -168,7 +168,13 @@ devecocli run
 | POST | `/api/focus/start` | 开始专注（创建 session） |
 | POST | `/api/focus/end` | 结束专注（记录时长 + 状态） |
 
-### 05-个人中心 & 统计
+### 05-日历
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/calendar?year=&month=` | 获取月历数据（含重复任务展开） |
+
+### 06-个人中心 & 统计
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -202,7 +208,7 @@ devecocli run
 
 | 页面 | 文件 | 路由 |
 |------|------|------|
-| 首页(四象限) | `Index.ets` | `pages/Index`（入口，含"助手""我的"Tab） |
+| 首页(四象限) | `Index.ets` | `pages/Index`（入口，底部栏 象限\|视图\|＋\|助手\|我的） |
 | 登录 | `LoginPage.ets` | `pages/LoginPage` |
 | 注册 | `RegisterPage.ets` | `pages/RegisterPage` |
 | 统一创建页 | `SliderCreatePage.ets` | `pages/SliderCreatePage`（新建+编辑双模式 / 手动+AI+引导入口 / 重复芯片） |
@@ -211,8 +217,9 @@ devecocli run
 | 个人中心 | `ProfilePage.ets` | `pages/ProfilePage`（从"我的"Tab头像进入，修改昵称/密码/退出） |
 | 统计 | `StatsPage.ets` | 嵌入在 Index.ets"我的"Tab中（累计/分布/周月趋势） |
 | AI 助手 | `AiChatPage.ets` | 嵌入在 Index.ets"助手"Tab中（基于任务数据的智能对话） |
+| 视图 | `CalendarPage.ets` | 嵌入在 Index.ets"视图"Tab中（月历 + 重复任务展开） |
 
-> 注：AiParsePage 已整合进 SliderCreatePage 的 AI 面板，不再独立注册；StatsPage 和 AiChatPage 作为子组件嵌入 Index.ets 的 Tab 中。共 **7 个注册页面** + 2 个嵌入式组件。
+> 注：AiParsePage 已整合进 SliderCreatePage；StatsPage/AiChatPage/CalendarPage 为嵌入式组件。共 **7 个注册页面** + 3 个嵌入式组件。
 
 ---
 
@@ -222,13 +229,14 @@ devecocli run
 2. **统一创建页** — 手动双滑块（实时象限判定）+ AI 粘贴识别 + 引导式问答，三合一入口
 3. **单击编辑** — 点击任意象限任务进入编辑页，预填所有字段（内容/滑块/截止日期/重复模式）
 4. **拖拽操作** — 长按拖动任务：上方红色番茄钟、下方绿色完成/红色删除，松手即执行
-5. **重复模式** — 新建/编辑时可选"每日""仅工作日""仅休息日"快捷芯片
+5. **重复模式** — 新建/编辑时可选"每日""仅工作日""仅休息日"，视图页自动展开到月历各日
 6. **AI 智能解析** — DeepSeek API 接入，粘贴自然语言文本自动提取事项/评分/象限
 7. **AI 知识库问答** — FAQ 关键词匹配优先 → DeepSeek 兜底，频率限制 10 次/分钟
 8. **番茄钟** — 1-120 分钟可调专注倒计时，环形进度条，记录专注时长
 9. **决策统计** — 累计/完成/放弃 + 四象限分布 + 周/月完成统计
 10. **AI 任务助手** — 基于用户实际任务数据提供个性化建议，支持多轮对话（"我今天该先做什么？"）
-11. **JWT 安全认证** — BCrypt 密码加密、Token 24h 有效期、归属校验（403 拦截越权）
+11. **月历视图** — 以月历网格展示任务分布，支持月份切换、日期点击查看任务、重复任务自动展开
+12. **JWT 安全认证** — BCrypt 密码加密、Token 24h 有效期、归属校验（403 拦截越权）
 
 ---
 
@@ -239,7 +247,7 @@ devecocli run
 | `@State` / `@Prop` / `@Builder` / `@Watch` | 组件状态管理与 UI 复用 |
 | `List` + `ListItem` | 象限任务列表渲染 |
 | `Grid` + `GridItem` | 2×2 四象限网格布局 |
-| `Tabs` + `TabContent` | 象限/我的 双 Tab 切换 |
+| `Tabs` + `TabContent` | 四 Tab 切换（象限/视图/助手/我的） |
 | `Progress` (Ring + Linear) | 番茄钟进度环 + 统计分布进度条 |
 | `Preferences` | Token 本地持久化存储 |
 | `setInterval` / `clearInterval` | 番茄钟倒计时 |
@@ -250,6 +258,8 @@ devecocli run
 | `AppStorage` | 跨页面参数传递（编辑模式/番茄钟入口） |
 | `.draggable()` / `.onDrop()` / `.onDragStart()` | 拖拽至番茄钟/完成/删除区域 |
 | `Scroller` + `scrollEdge()` | AI 聊天消息列表自动滚底 |
+| `Stack` + `.position()` | 拖拽操作区浮层定位 |
+| `@Prop` + `@Watch` | 视图/统计页随任务变化自动刷新 |
 
 ---
 
@@ -268,6 +278,16 @@ devecocli run
 ---
 
 ## 已知问题与修复记录
+
+### v0.9.3 新增
+> - 月历视图（"视图"Tab）：月份切换、日期点击查看任务、重复任务自动展开到每日
+> - 后端 `GET /api/calendar` 接口 + CalendarService 展开重复任务
+> - 底部栏改为 象限 | 视图 | ＋ | 助手 | 我的（四个 Tab 对称）
+> - 修复拖拽完成不生效（MyBatis-Plus logic-delete-field 剥离 status → LambdaUpdateWrapper）
+> - 修复视图页数据不自动刷新（@Prop + @Watch 机制）
+> - 修复昵称/密码修改不生效（`put` 返回 null 导致 `if (data)` 跳过更新）
+> - 过滤已完成/已删除任务不在象限中显示
+> - `init.sql` ③④象限各 +2 条测试数据
 
 ### v0.8.0 新增
 > - AI 助手页面（"助手"Tab）：基于用户任务数据提供个性化建议，支持多轮对话
@@ -313,4 +333,4 @@ A: 详见 `deploy/README.md`。后端使用 systemd 管理：`systemctl restart 
 
 ---
 
-> 最后更新：2026-06-26 · MindDef v0.9.3 · GitHub: https://github.com/Broccolisky/MindDef
+> 最后更新：2026-06-26 · MindDef v0.9.5 · GitHub: https://github.com/Broccolisky/MindDef
