@@ -1,7 +1,7 @@
 /**
  * MindDef 首页 —— 四象限看板
  *
- * 2×2 网格展示四个象限任务，TabBar 切换象限/助手/我的
+ * 2×2 网格展示四个象限任务，TabBar 切换象限/视图/助手/我的
  */
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
@@ -12,6 +12,7 @@ import { TaskCard } from '../components/TaskCard';
 import { IconLabel } from '../components/IconLabel';
 import { StatsPage } from './StatsPage';
 import { AiChatPage } from './AiChatPage';
+import { CalendarPage } from './CalendarPage';
 
 @Entry
 @Component
@@ -45,8 +46,8 @@ struct Index {
   }
 
   onTabChange(): void {
-    // "我的" Tab 现在是索引 2（0=象限, 1=助手, 2=我的）
-    if (this.currentTab === 2) {
+    // 0=象限, 1=视图, 2=助手, 3=我的
+    if (this.currentTab === 3) {
       this.statsRefreshKey++;
     }
   }
@@ -419,12 +420,17 @@ struct Index {
               }
             }
 
-            // ── Tab 2: 助手 ──
+            // ── Tab 2: 视图 ──
+            TabContent() {
+              CalendarPage()
+            }
+
+            // ── Tab 3: 助手 ──
             TabContent() {
               AiChatPage()
             }
 
-            // ── Tab 3: 我的 ──
+            // ── Tab 4: 我的 ──
             TabContent() {
               Column() {
                 // 用户信息行
@@ -463,7 +469,7 @@ struct Index {
                 .layoutWeight(1)
 
                 // 版本号
-                Text('v0.8.1')
+                Text('v0.9.3')
                   .fontSize(12)
                   .fontColor('#bbb')
                   .padding({ bottom: 8 })
@@ -479,10 +485,10 @@ struct Index {
           .barHeight(0)       // 隐藏原生 TabBar
           .barPosition(BarPosition.End)
 
-          // ── 自定义底部栏：象限 | 助手 | ＋ | 我的 ──
+          // ── 自定义底部栏：象限 | 视图 | ＋ | 助手 | 我的 ──
           Row() {
             Text('象限')
-              .fontSize(15)
+              .fontSize(14)
               .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
               .fontColor(this.currentTab === 0 ? '#4a90d9' : '#999')
               .layoutWeight(1)
@@ -490,8 +496,8 @@ struct Index {
               .padding({ top: 12, bottom: 12 })
               .onClick(() => { this.currentTab = 0; })
 
-            Text('助手')
-              .fontSize(15)
+            Text('视图')
+              .fontSize(14)
               .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
               .fontColor(this.currentTab === 1 ? '#4a90d9' : '#999')
               .layoutWeight(1)
@@ -501,27 +507,35 @@ struct Index {
 
             // ＋ 创建按钮
             Button('+')
-              .width(48)
-              .height(48)
-              .fontSize(26)
+              .width(44)
+              .height(44)
+              .fontSize(24)
               .fontWeight(FontWeight.Lighter)
               .backgroundColor('#4a90d9')
               .fontColor('#ffffff')
-              .borderRadius(24)
+              .borderRadius(22)
               .shadow({ radius: 6, color: '#604a90d9' })
-              .margin({ bottom: 8 })
               .onClick(() => {
                 router.pushUrl({ url: 'pages/SliderCreatePage' });
               })
 
-            Text('我的')
-              .fontSize(15)
+            Text('助手')
+              .fontSize(14)
               .fontWeight(this.currentTab === 2 ? FontWeight.Bold : FontWeight.Normal)
               .fontColor(this.currentTab === 2 ? '#4a90d9' : '#999')
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
               .padding({ top: 12, bottom: 12 })
               .onClick(() => { this.currentTab = 2; })
+
+            Text('我的')
+              .fontSize(14)
+              .fontWeight(this.currentTab === 3 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 3 ? '#4a90d9' : '#999')
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+              .padding({ top: 12, bottom: 12 })
+              .onClick(() => { this.currentTab = 3; })
           }
           .width('100%')
           .backgroundColor('#ffffff')

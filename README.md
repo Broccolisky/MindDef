@@ -313,4 +313,4 @@ A: 详见 `deploy/README.md`。后端使用 systemd 管理：`systemctl restart 
 
 ---
 
-> 最后更新：2026-06-26 · MindDef v0.8.1 · GitHub: https://github.com/Broccolisky/MindDef
+> 最后更新：2026-06-26 · MindDef v0.9.3 · GitHub: https://github.com/Broccolisky/MindDef
