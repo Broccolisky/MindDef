@@ -388,9 +388,19 @@ struct Index {
 
                 Divider()
 
-                // 统计
-                StatsPage({ refreshKey: this.statsRefreshKey })
+                // 统计（弹性空间）
+                Column() {
+                  StatsPage({ refreshKey: this.statsRefreshKey })
+                }
+                .layoutWeight(1)
+
+                // 版本号
+                Text('v0.6.4')
+                  .fontSize(12)
+                  .fontColor('#bbb')
+                  .padding({ bottom: 8 })
               }
+              .alignItems(HorizontalAlign.Center)
               .width('100%')
               .height('100%')
               .backgroundColor('#f8f8f8')
