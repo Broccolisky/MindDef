@@ -6,6 +6,7 @@ import { IconLabel } from '../components/IconLabel';
 
 @Component
 export struct StatsPage {
+  @Prop @Watch('loadStats') refreshKey: number = 0;
   @State total: number = 0;
   @State completed: number = 0;
   @State abandoned: number = 0;
@@ -16,6 +17,8 @@ export struct StatsPage {
   @State quad3: number = 0;
   @State quad4: number = 0;
   @State loaded: boolean = false;
+
+  @State distTotal: number = 0;
 
   aboutToAppear(): void {
     this.loadStats();
@@ -37,12 +40,9 @@ export struct StatsPage {
         this.quad3 = qd['3'] || 0;
         this.quad4 = qd['4'] || 0;
       }
+      this.distTotal = this.quad1 + this.quad2 + this.quad3 + this.quad4;
       this.loaded = true;
     }
-  }
-
-  get distTotal(): number {
-    return this.quad1 + this.quad2 + this.quad3 + this.quad4;
   }
 
   pct(n: number): string {

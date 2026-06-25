@@ -15,7 +15,7 @@ import { StatsPage } from './StatsPage';
 @Entry
 @Component
 struct Index {
-  @State currentTab: number = 0;
+  @State @Watch('onTabChange') currentTab: number = 0;
   @State isLogin: boolean = false;
   @State tasks: TaskModel[] = [];
   @State loading: boolean = true;
@@ -24,6 +24,7 @@ struct Index {
   @State isSearching: boolean = false;
   @State searchText: string = '';
   @State nickname: string = '';
+  @State statsRefreshKey: number = 0;
   // selectedTask/showActionMenu 已移除 —— handleLongPress 直接调用 AlertDialog
 
   // 四个象限元数据（按数轴排列：横轴=紧迫度左低右高，纵轴=重要度上高下低）
@@ -40,6 +41,12 @@ struct Index {
 
   onPageShow(): void {
     this.checkLogin();
+  }
+
+  onTabChange(): void {
+    if (this.currentTab === 1) {
+      this.statsRefreshKey++;
+    }
   }
 
   async checkLogin(): Promise<void> {
@@ -64,6 +71,7 @@ struct Index {
       if (data) {
         this.tasks = data as TaskModel[];
       }
+      this.statsRefreshKey++;
     } finally {
       this.loading = false;
     }
@@ -381,7 +389,7 @@ struct Index {
                 Divider()
 
                 // 统计
-                StatsPage()
+                StatsPage({ refreshKey: this.statsRefreshKey })
               }
               .width('100%')
               .height('100%')
